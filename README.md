@@ -144,6 +144,129 @@ Ubuntu 默认使用国外软件源，将其更改为国内软件源可提高下�
 
 ![image-20241015192845500](.assets/image-20241015192845500.png)
 
+### 3. 设置共享文件夹
+
+#### 1. 添加共享文件夹
+
+左上菜单栏找到 虚拟机 -> 设置，打开设置页面
+
+![image-20241015194843795](.assets/image-20241015194843795.png)
+
+![image-20241015195052975](.assets/image-20241015195052975.png)
+
+点击添加后，根据引导完成设置即可。
+
+#### 2. 访问共享文件夹
+
+**共享文件夹挂载位置：** `/mnt/hgfs`
+
+1. 列出全部已共享文件夹 `ls /mnt/hgfs`
+
+```shell
+sprinec@sprinec-virtual-machine:/$ ls /mnt/hgfs
+LinuxLearn
+```
+
+2. 进入共享文件夹
+
+```shell
+cd /mnt/hgfs/LinuxLearn
+```
+
+3. 复制虚拟机中文件到共享文件夹
+
+```shell
+cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
+```
+
+
+
+## 二. Linux 驱动开发学习
+
+> **参考书籍：** [野火]《嵌入式Linux驱动开发实战指南—基于LubanCat RK系列板卡》
+>
+> **使用板卡：** LubanCat 4 RK3588S
+
+### 1. 获取内核源码
+
+#### 1. 安装 git
+
+```shell
+sudo apt-get install git
+```
+
+#### 2. 创建存放文件夹
+
+```shell
+mkdir LubanCat
+cd LubanCat
+```
+
+#### 3. 获取内核源码
+
+##### 1. 从GitHub获取
+
+```shell
+git clone -b develop-5.10 https://github.com/LubanCat/kernel.git
+```
+
+##### 2. 从野火共享的网盘资料中获取压缩包
+
+`LubanCat_Linux_rk3588_SDK_20240510.7z` 
+
+1. 将压缩包下载到 windows 端之前设置的共享文件夹，在ubuntu中进入挂载目录进行拷贝
+
+```shell
+cd /mnt/hgfs/LinuxLearn
+cp LubanCat_Linux_rk3588_SDK_20240510.7z ~/桌面/LubanCat/LubanCat4_RK3588_SDK
+```
+
+2. 安装 `7z`
+
+```shell
+sudo apt install p7zip-full
+```
+
+3. 进入拷贝目录，进行解压
+
+```shell
+cd ~/桌面/LubanCat/LubanCat4_RK3588_SDK
+7z x LubanCat_Linux_rk3588_SDK_20240510.7z
+```
+
+4. 检出 *.repo* 目录下的 git 仓库
+
+```shell
+.repo/repo/repo sync -l
+```
+
+5. 进入 kernel 目录
+
+```
+ls
+cd kernel
+```
+
+### 2. PC端编译内核
+
+#### 1. 获取编译工具链
+
+```shell
+git clone https://github.com/LubanCat/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu.git
+```
+
+导出环境变量
+
+```shell
+export PATH=/root/gcc-linaro-6.3.1-2017.05-x86_64_aarch64-linux-gnu/bin:$PATH
+```
+
+查看编译工具链
+
+```shell
+aarch64-linux-gnu-gcc -v
+```
+
 
 
 ## OTHER
@@ -182,6 +305,14 @@ Ubuntu 默认使用国外软件源，将其更改为国内软件源可提高下�
 sudo apt-get install open-vm-tools-desktop
 ```
 
+卸载（建议别卸载，容易出问题，见：**ERROR LOG** : VMWare 虚拟机共享文件夹不显示）
+
+```shell
+sudo apt-get remove --purge open-vm-tools-desktop
+```
+
+**`--purge`** : 这个选项会一起删除该软件包的配置文件，确保完全清除。
+
 ### Windows 与 VMWare-Ubuntu 跨系统复制粘贴
 
 > **参考：** https://askubuntu.com/questions/691585/copy-paste-and-dragdrop-not-working-in-vmware-machine-with-ubuntu/824341#824341
@@ -191,7 +322,52 @@ sudo apt-get install open-vm-tools-desktop
 ```shell
 sudo apt-get autoremove open-vm-tools
 sudo apt-get install open-vm-tools
+sudo apt-get install open-vm-tools-desktop
 ```
 
+## ERROR LOG
 
+### VMWare 虚拟机共享文件夹不显示
+
+> **参考博客：** [虚拟机设置共享文件夹添加不显示](https://blog.csdn.net/qq_41880069/article/details/86158454)
+
+1. 确保 `open-vm-tools` 及 `open-vm-tools-desktop` 已安装
+
+```shell
+sudo apt-get install open-vm-tools
+sudo apt-get install open-vm-tools-desktop
+```
+
+2. 进行挂载配置
+
+```shell
+sudo vmhgfs-fuse .host:/ /mnt/hgfs
+```
+
+3. 检查挂载
+
+```shell
+mount | grep hgfs
+```
+
+4. 确保挂载目录存在
+
+```shell
+sudo mkdir -p /mnt/hgfs
+sudo chmod 755 /mnt/hgfs
+```
+
+5. 进行上述配置后可能会提示权限不足，输入以下命令更改权限
+
+```shell
+sudo umount /mnt/hgfs 
+sudo vmhgfs-fuse .host:/ /mnt/hgfs -o allow_other,uid=$(id -u),gid=$(id -g)
+```
+
+6. 最后使用命令查看是否可以正常访问
+
+```shell
+cd /mnt/hgfs
+ls
+```
 
