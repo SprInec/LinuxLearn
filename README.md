@@ -4,11 +4,11 @@
 
 ## 一. VMWare 虚拟机安装
 
->  **所选系统：**Ubuntu20.04
+>  **所选系统：** Ubuntu20.04
 >
->  **VMware 版本：**Workstation 17 Pro
+>  **VMware 版本：** Workstation 17 Pro
 >
->  **参考博客：**[VMware虚拟机安装Ubuntu20.04详细图文教程](https://blog.csdn.net/weixin_41805734/article/details/120698714)
+>  **参考博客：** [VMware虚拟机安装Ubuntu20.04详细图文教程](https://blog.csdn.net/weixin_41805734/article/details/120698714)
 
 ### 1. 系统镜像下载
 
@@ -61,8 +61,6 @@
 ![image-20241015175141784](.assets/image-20241015175141784.png)
 
 ![image-20241015182746252](.assets/image-20241015182746252.png)
-
-
 
 ##### 2. 语言及键盘配置
 
@@ -152,7 +150,7 @@ Ubuntu 默认使用国外软件源，将其更改为国内软件源可提高下�
 
 ### VMWare 删除虚拟机
 
-> **参考博客：**[VMware 彻底删除虚拟机操作系统的方法](https://blog.csdn.net/qq_36761831/article/details/82351329)
+> **参考博客：** [VMware 彻底删除虚拟机操作系统的方法](https://blog.csdn.net/qq_36761831/article/details/82351329)
 
 方法一：
 
@@ -186,7 +184,7 @@ sudo apt-get install open-vm-tools-desktop
 
 ### Windows 与 VMWare-Ubuntu 跨系统复制粘贴
 
-> **参考：**https://askubuntu.com/questions/691585/copy-paste-and-dragdrop-not-working-in-vmware-machine-with-ubuntu/824341#824341
+> **参考：** https://askubuntu.com/questions/691585/copy-paste-and-dragdrop-not-working-in-vmware-machine-with-ubuntu/824341#824341
 
 通过安装VMtools实现了Windows与Ubuntu跨系统复制粘贴，打开终端，手动输入以下命令，再重启ubuntu系统即可。
 
