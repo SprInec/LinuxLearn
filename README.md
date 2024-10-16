@@ -183,7 +183,7 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 
 ## 二. Linux 基础与应用开发
 
-> **参考书籍：** [野火]《Linux基础与应用开发实战指南—基于LubanCat-RK系列板卡》
+> **参考书籍：** [[野火]《Linux基础与应用开发实战指南—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/linux_base/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
 
@@ -972,7 +972,7 @@ git remote add origin git@github.com:你的用户名/仓库名.git
 
 ```bash
 git add .
-git commit -m "首次提交"
+git commit -m "first commit"
 ```
 
 ##### 4. 推送到 GitHub
@@ -1029,21 +1029,25 @@ git push -u origin main
 
 
 
-
-
 ## 三. Linux 镜像构建与部署
 
-> **参考书籍：** [野火]《嵌入式Linux镜像构建与部署—基于LubanCat-RK系列板卡》
+> **参考书籍：** [[野火]《嵌入式Linux镜像构建与部署—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/build_and_deploy/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
 
 
 
+## 四. Linux Qt 应用开发
+
+> **参考书籍：** [[野火]《嵌入式Qt应用开发指南-基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/Qt/zh/latest/index.html)
+>
+> **使用板卡：** LubanCat 4 RK3588S
 
 
-## 四. Linux 驱动开发
 
-> **参考书籍：** [野火]《嵌入式Linux驱动开发实战指南—基于LubanCat RK系列板卡》
+## 五. Linux 驱动开发
+
+> **参考书籍：** [[野火]《嵌入式Linux驱动开发实战指南—基于LubanCat RK系列板卡》](https://doc.embedfire.com/linux/rk356x/driver/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
 
@@ -1192,6 +1196,14 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- lubancat_linux_rk3588_defconfig
 ```shell
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8
 ```
+
+
+
+## 六. 嵌入式AI应用开发
+
+> **参考书籍：** [[野火]《嵌入式AI应用开发实战指南—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/Ai/zh/latest/index.html)
+>
+> **使用板卡：** LubanCat 4 RK3588S
 
 
 
