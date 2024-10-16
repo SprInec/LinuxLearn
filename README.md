@@ -631,6 +631,293 @@ sudo chmod u+x hello_world.sh
 source hello_world.sh
 ```
 
+### 7. Git 项目版本管理
+
+#### 7.1 Git 安装与配置
+
+1. 安装 Git，在终端输入下列命令：
+
+    ```shell
+    sudo apt-get install git -y
+    ```
+
+    - `-y` ：询问是否安装时默认选择 Yes
+
+2. 用户配置，配置用户名和邮箱
+
+    ```shell
+    git config --global user.email xxx
+    git config --global user.name xxx
+    ```
+
+    - `--global` ： 配置 `~/.gitconfig` 文件，对当前用户下的所有仓库有效
+    - `--system` ：配置 `/etc/gitconfig` 文件，对当前系统下的所有用户有效
+    - 无参数：配置 `.git/config` 文件，只对当前仓库有效
+
+#### 7.2 Git 本地项目管理简单使用流程
+
+1. 创建本地仓库
+
+    ```shell
+    git init [仓库名称]
+    ```
+
+2. 添加/修改文件
+
+    ```shell
+    cd [仓库名称]
+    touch FILE1, FILE2, FILE3, ...
+    vim FILE1
+    ...
+    ```
+
+3. 将文件的修改变化保存到仓库的暂存区
+
+    保存单个/多个文件修改：
+
+    ```shell
+    git add FILE1, FILE2
+    ```
+
+    保存全部修改：
+
+    ```
+    git add *
+    ```
+
+4. 将保存到暂存区的修改提交到本地仓库
+
+    ```shell
+    git commit -m "The changes you want to add"
+    ```
+
+    - `-m "MESSAGE"` ：提交信息
+
+5. 查看提交历史
+
+    ```shell
+    git log
+    ```
+
+6. 根据提交的 ID 查看某一个提交的详细信息
+
+    ```shell
+    git show COMMIT_ID
+    ```
+
+#### 7.3 Git 线上托管项目管理简单使用流程
+
+GitHub 和 Gitee 是一个基于 Git 的在线项目托管平台，它提供了 web 界面,，用户可以在上面创建远程仓库来存放自己的项目。所有的开发者可以基于这个远程仓库共同协作，不断地维护和完善该项目。
+
+> 该节以 GitHub 为例，Gitee 同理
+
+##### 7.3.1 GitHub 获取线上项目方式比较
+
+在 GitHub 上克隆或者管理项目时，常用的方式一般有以下三种：
+
+![image-20241017025151559](.assets/image-20241017025151559.png)
+
+1. **HTTPS **
+    - 简单易用，不需要额外配置，直接使用用户名和密码（或 token），但 GitHub 近期似乎不再支持使用用户名和密码进行身份验证，使用 Personal Access Token 进行替代。
+    - GitHub 网速在国内受限，可能会出现多次下载失败的现象（需要科学上网）。
+    - 安全性相对较低：密码可能被窃取，尤其在不安全的网络上。
+    - 每次操作都需输入密码（如果未缓存）。
+2. **SSH **
+    - 安全性高，使用密钥对进行身份验证，避免密码泄露风险。
+    - 方便，一旦设置好，推送和拉取时无需输入密码。
+    - 相较于 HTTPS，在国内下载项目速度更快。
+    - 初始配置较复杂，需要生成密钥并添加到 GitHub。
+3. **ZIP 下载**
+    - 简单直观，用户只需点击下载链接，操作非常简单，不需要安装 Git 或配置身份验证。
+    - 缺乏版本控制，下载 ZIP 只会获取当前代码快照，不能方便地进行版本管理和更新。
+    - 不能执行 Git 操作，无法进行常规的 Git 操作（如分支管理、合并等），需要手动管理文件。
+
+总结比较：
+
+- **SSH** 和 **HTTPS** 更适合需要频繁更新和版本控制的开发者，能够轻松进行 Git 操作。
+- **ZIP 下载** 更适合不熟悉 Git 的用户或临时需要代码快照的情况，但不适合长期开发使用。
+
+这里我们采用 SSH 方式。
+
+##### 7.3.2 生成 SSH 密钥
+
+终端输入以下命令：
+
+```shell
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+```
+
+在密钥生成过程中会出现以下询问：
+
+```shell
+Enter file in which to save the key (/home/username/.ssh/id_rsa): 
+```
+
+可以直接按 Enter 键，以使用默认的文件路径 `/home/username/.ssh/id_rsa` 保存 SSH 密钥。这样会在这个位置生成一个新的密钥文件。如果你希望使用不同的名称或路径，可以输入新的文件名，然后按 Enter 键。通常情况下，使用默认路径即可。
+
+```shell
+Enter passphrase (empty for no passphrase): 
+```
+
+在这个提示中，你可以选择输入一个密码短语（passphrase）来保护你的 SSH 密钥。这个密码短语在你每次使用密钥时会要求你输入，以增加安全性。如果你不想每次都输入密码短语，可以直接按 Enter 键留空。
+
+生成密钥后，你会看到一个公钥文件 `id_rsa.pub`。记得将这个公钥添加到你的 GitHub 账户中，以便进行 SSH 连接。你可以用以下命令查看公钥内容：
+
+```
+cat ~/.ssh/id_rsa.pub
+```
+
+- 确保复制的内容包括开头的 `ssh-rsa`，后面是长字符串，最后是你的邮箱地址。
+
+##### 7.3.3 GitHub 上添加 SSH 密钥
+
+1. 点击右上角头像打开菜单栏，进入设置页面
+
+    ![image-20241017024300849](.assets/image-20241017024300849.png)
+
+2. 找到 SSH and GPG keys，点击 New SSH key
+
+    ![image-20241017024518139](.assets/image-20241017024518139.png)
+
+3. Title 任取，将 `id_rsa.pub` 中复制的密钥粘贴在 Key 栏中，后点击 Add SSH key 即可
+
+    ![image-20241017024627334](.assets/image-20241017024627334.png)
+
+4. 后续可在 SSH and GPG keys 页面管理自己的密钥
+
+    ![image-20241017024849017](.assets/image-20241017024849017.png)
+
+
+
+##### 7.3.4 通过 SSH 从线上仓库克隆项目
+
+在 GitHub 或者 Gitee 网站上,找到需要下载的项目，复制该项目的 SSH 链接。
+
+![image-20241017030734408](.assets/image-20241017030734408.png)
+
+
+
+在终端 `cd` 到合适的目录运行下列命令：
+
+```shell
+git clone git@github.com:SprInec/LinuxLearn.git
+```
+
+第一次使用 SSH 克隆项目回车后可能会看到如下提示
+
+![image-20241017031322097](.assets/image-20241017031322097.png)
+
+这是 SSH 连接的安全提示，询问你是否信任 GitHub 的服务器。输入 `yes` 并按 Enter 键，系统将会将 GitHub 的主机密钥添加到你的 `~/.ssh/known_hosts` 文件中，之后就不会再出现这个提示。
+
+继续后续操作，`git clone` 会开始下载仓库，稍作等待即可在当前目录下看到克隆的项目文件夹。
+
+##### 7.3.5 在本地进行项目更改及推送
+
+下面的操作和在本地进行项目管理的操作基本一致，只是多了 `push` 和 `pull` 两个进行线上和本地同步的操作。
+
+1. 添加/修改文件
+
+    ```shell
+    cd [仓库名称]
+    touch FILE1, FILE2, FILE3, ...
+    vim FILE1
+    ...
+    ```
+
+2. 将文件的修改变化保存到仓库的暂存区
+
+    保存单个/多个文件修改：
+
+    ```shell
+    git add FILE1, FILE2
+    ```
+
+    保存全部修改：
+
+    ```
+    git add *
+    ```
+
+3. 将保存到暂存区的修改提交到本地仓库
+
+    ```shell
+    git commit -m "The changes you want to add"
+    ```
+
+    - `-m "MESSAGE"` ：提交信息
+
+
+4. 
+
+1. 查看提交历史
+
+    ```shell
+    git log
+    ```
+
+2. 根据提交的 ID 查看某一个提交的详细信息
+
+    ```shell
+    git show COMMIT_ID
+    ```
+
+#### 7.4 Git 项目管理的一般步骤
+
+**1. 创建或克隆仓库**：
+
+- 使用 `git init` 创建新的本地仓库。
+- 使用 `git clone <repo-url>` 克隆现有的远程仓库。
+
+**2. 配置用户信息**（如果是新仓库）：
+
+```bash
+git config --global user.name "Your Name"
+git config --global user.email "your_email@example.com"
+```
+
+**3. 查看状态**：
+
+- 使用 `git status` 查看当前工作区和暂存区的状态。
+
+**4. 添加更改**：
+
+- 使用 `git add <file>` 将更改添加到暂存区，或使用 `git add .` 添加所有更改。
+
+**5. 提交更改**：
+
+- 使用 `git commit -m "Commit message"` 提交暂存区的更改。
+
+**6. 推送到远程**：
+
+- 使用 `git push origin <branch-name>` 将本地提交推送到远程仓库。
+
+**7. 拉取更新**：
+
+- 使用 `git pull origin <branch-name>` 从远程仓库获取并合并最新的更改。
+
+**8. 处理分支**（可选）：
+
+- 创建新分支：`git branch <branch-name>`
+- 切换分支：`git checkout <branch-name>`
+- 合并分支：`git merge <branch-name>`
+
+**9. 解决冲突**（如有）：
+
+- 在合并过程中可能会出现冲突，手动解决后，重新添加和提交。
+
+**10. 查看历史记录**：
+
+- 使用 `git log` 查看提交历史。
+
+
+
+
+
+
+
+
+
+
 
 
 ## 三. Linux 镜像构建与部署
