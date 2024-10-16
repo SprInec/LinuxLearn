@@ -1,6 +1,6 @@
 # README
 
- Linux learning record
+ Linux learning record.
 
 [TOC]
 
