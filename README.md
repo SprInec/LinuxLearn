@@ -682,7 +682,7 @@ source hello_world.sh
     保存全部修改：
 
     ```
-    git add *
+    git add .
     ```
 
 4. 将保存到暂存区的修改提交到本地仓库
@@ -717,12 +717,12 @@ GitHub 和 Gitee 是一个基于 Git 的在线项目托管平台，它提供了 
 
 ![image-20241017025151559](.assets/image-20241017025151559.png)
 
-1. **HTTPS **
+1. **HTTPS**
     - 简单易用，不需要额外配置，直接使用用户名和密码（或 token），但 GitHub 近期似乎不再支持使用用户名和密码进行身份验证，使用 Personal Access Token 进行替代。
     - GitHub 网速在国内受限，可能会出现多次下载失败的现象（需要科学上网）。
     - 安全性相对较低：密码可能被窃取，尤其在不安全的网络上。
     - 每次操作都需输入密码（如果未缓存）。
-2. **SSH **
+2. **SSH**
     - 安全性高，使用密钥对进行身份验证，避免密码泄露风险。
     - 方便，一旦设置好，推送和拉取时无需输入密码。
     - 相较于 HTTPS，在国内下载项目速度更快。
@@ -811,20 +811,31 @@ git clone git@github.com:SprInec/LinuxLearn.git
 
 继续后续操作，`git clone` 会开始下载仓库，稍作等待即可在当前目录下看到克隆的项目文件夹。
 
-##### 7.3.5 在本地进行项目更改及推送
+##### 7.3.5 进行项目更改及推送
 
 下面的操作和在本地进行项目管理的操作基本一致，只是多了 `push` 和 `pull` 两个进行线上和本地同步的操作。
 
-1. 添加/修改文件
+1. 进入项目仓库
 
     ```shell
     cd [仓库名称]
+    ```
+
+2. 拉取远程仓库的最新更改
+
+    ```shell
+    git pull
+    ```
+
+3. 添加/修改文件
+
+    ```shell
     touch FILE1, FILE2, FILE3, ...
     vim FILE1
     ...
     ```
-
-2. 将文件的修改变化保存到仓库的暂存区
+    
+4. 将文件的修改变化保存到仓库的暂存区
 
     保存单个/多个文件修改：
 
@@ -835,10 +846,10 @@ git clone git@github.com:SprInec/LinuxLearn.git
     保存全部修改：
 
     ```
-    git add *
+    git add .
     ```
 
-3. 将保存到暂存区的修改提交到本地仓库
+5. 将保存到暂存区的修改提交到本地仓库
 
     ```shell
     git commit -m "The changes you want to add"
@@ -847,21 +858,46 @@ git clone git@github.com:SprInec/LinuxLearn.git
     - `-m "MESSAGE"` ：提交信息
 
 
-4. 
+6. 将本地提交推送到远程仓库
 
-1. 查看提交历史
+    ```shell
+    git push
+    ```
+
+7. 查看提交历史
 
     ```shell
     git log
     ```
 
-2. 根据提交的 ID 查看某一个提交的详细信息
+8. 根据提交的 ID 查看某一个提交的详细信息
 
     ```shell
     git show COMMIT_ID
     ```
 
 #### 7.4 Git 项目管理的一般步骤
+
+```mermaid
+graph TD;
+    A[创建或克隆仓库] -->|git init| B[本地新仓库]
+    A -->|git clone| C[远程仓库]
+    
+    B -->|git config| E[配置用户名和邮箱]
+    E -->|git status| F[查看状态]
+    F -->|git add .| G[添加文件]
+    G -->|git commit| H[提交更改]
+    H --> |git log| R1[查看历史记录]
+    
+    C -->|git config| E
+    E -->|git status| L[查看状态]
+    L -->|git pull origin <branch>| M[拉取远程更新]
+    M --> N[进行本地修改]
+    N -->|git add .| O[添加更改]
+    O -->|git commit| P[提交更改]
+    P -->|git push| Q[推送到远程]
+    Q -->|git log| R2[查看历史记录]
+```
 
 **1. 创建或克隆仓库**：
 
@@ -877,23 +913,23 @@ git config --global user.email "your_email@example.com"
 
 **3. 查看状态**：
 
-- 使用 `git status` 查看当前工作区和暂存区的状态。
+使用 `git status` 查看当前工作区和暂存区的状态。
 
-**4. 添加更改**：
+**4. 拉取远程更新**：
 
-- 使用 `git add <file>` 将更改添加到暂存区，或使用 `git add .` 添加所有更改。
+使用 `git pull origin <branch-name>`  在进行本地修改之前，先拉取远程仓库的最新更改，以确保你的本地代码是最新的。这有助于避免后续推送时发生冲突。
 
-**5. 提交更改**：
+**5. 添加更改**：
 
-- 使用 `git commit -m "Commit message"` 提交暂存区的更改。
+使用 `git add <file>` 将更改添加到暂存区，或使用 `git add .` 添加所有更改。
 
-**6. 推送到远程**：
+**6. 提交更改**：
 
-- 使用 `git push origin <branch-name>` 将本地提交推送到远程仓库。
+使用 `git commit -m "Commit message"` 提交暂存区的更改。
 
-**7. 拉取更新**：
+**7. 推送到远程**：
 
-- 使用 `git pull origin <branch-name>` 从远程仓库获取并合并最新的更改。
+使用 `git push origin <branch-name>` 将本地提交推送到远程仓库。
 
 **8. 处理分支**（可选）：
 
@@ -903,17 +939,92 @@ git config --global user.email "your_email@example.com"
 
 **9. 解决冲突**（如有）：
 
-- 在合并过程中可能会出现冲突，手动解决后，重新添加和提交。
+在合并过程中可能会出现冲突，手动解决后，重新添加和提交。
 
 **10. 查看历史记录**：
 
-- 使用 `git log` 查看提交历史。
+使用 `git log` 查看提交历史。
 
+#### 7.5 Git 本地项目上传到 GitHub
 
+将本地通过 `git init` 创建的新仓库推送到 GitHub 的步骤如下：
 
+##### 1. 创建 GitHub 仓库
 
+- 登录到 GitHub，点击右上角的 `+` 图标，然后选择 `New repository` 。
+- 输入仓库名称和描述，选择是否公开或私有，最后点击 `Create repository`。
 
+##### 2. 在本地仓库中添加远程仓库
 
+在本地仓库中，使用以下命令将 GitHub 仓库设置为远程仓库：
+
+```bash
+git remote add origin git@github.com:你的用户名/仓库名.git
+```
+
+- 替换 `你的用户名` 和 `仓库名` 为你实际的 GitHub 用户名和创建的仓库名。
+
+- `git@github.com:你的用户名/仓库名.git` 为 SSH 链接
+
+##### 3. 添加文件并提交
+
+如果还没有添加文件，可以按照以下步骤进行：
+
+```bash
+git add .
+git commit -m "首次提交"
+```
+
+##### 4. 推送到 GitHub
+
+使用以下命令将本地仓库的更改推送到 GitHub：
+
+```bash
+git push -u origin master
+```
+
+如果使用的是 `main` 分支，替换为：
+
+```bash
+git push -u origin main
+```
+
+#### 7.6 常用 Git 命令
+
+- `git init` ：初始化一个新的 Git 仓库
+
+- `git clone <repo-url>` ：克隆一个远程仓库到本地
+
+- `git status` ：查看当前工作区和暂存区的状态
+
+- `git log` ：查看提交历史
+
+- `git add <file>` ：将指定文件添加到暂存区
+
+- `git add .` ：将当前目录及其所有子目录下的所有文件添加到暂存区
+- `git add *`：将当前目录下的所有文件（不包括子目录中的文件）添加到暂存区
+
+- `git commit -m "Commit message"` ：提交暂存区的更改，并附上提交信息
+
+- `git branch` ：列出所有本地分支
+
+- `git branch <branch-name>` ：创建一个新分支
+
+- `git checkout <branch-name>` ：切换到指定分支
+
+- `git merge <branch-name>` ：将指定分支合并到当前分支
+
+- `git pull origin <branch-name>` ：从远程仓库拉取并合并指定分支的更新
+
+- `git push origin <branch-name>` ：将本地分支的更改推送到远程仓库
+
+- `git remote -v` ：查看当前配置的远程仓库
+
+- `git rev-parse --abbrev-ref HEAD` ：查看当前所在的分支
+
+- `git checkout -- <file>` ：撤销未暂存的修改
+
+- `git reset HEAD~1` ：撤销最近一次提交（保留修改）
 
 
 
