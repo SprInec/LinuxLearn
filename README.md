@@ -1364,9 +1364,97 @@ ldd hello_static
 
 #### 8.4 Hello World Pro-1
 
+main 函数传参：
 
+```c
+int main(int argc, char **argv)
+```
 
+例：命令端执行
 
+```bash
+./hello aaa bbb ccc
+```
+
+- `int argc` ：保存参数的个数，上例中 argc = 4
+- `char **argv` ：保存传入的参数的指向字符串数组的指针
+    1. argv[0] = ./hello
+    2. argv[1] = aaa
+    3. argv[2] = bbb
+    4. argv[3] = ccc
+
+进入目录 `base_linux/hello/hello_arg`
+
+```bash
+cd base_linux/hello/hello_arg
+```
+
+使用 Vim 创建并编辑文件 `hello_arg.c`
+
+```bash
+vim hello_arg.c
+```
+
+```C
+#include <stdio.h>
+
+int main(int argc, char **argv)
+{       
+        int i;
+        if (argc >= 2)
+        {
+                printf("you enter: \"");
+                for (i = 0; i < argc; i++)
+                {
+                        printf("%s", argv[i]);
+                }
+                printf("\"\n");
+                printf("you enter %d strings\n", argc);
+        }       
+        else
+        {       
+                printf("hello, world! This is a C program.\n");
+        }       
+
+        return 0;
+}
+```
+
+编译并执行文件：
+
+```bash
+gcc hello_arg.c -o hello_arg
+```
+
+```bash
+./hello_arg 1 2 3 4 5
+```
+
+![image-20241017220546347](.assets/image-20241017220546347.png)
+
+> :warning:**NOTICE​**
+>
+> 输入的参数都是以字符串的形式保存，如果输入数字的话，需要字符串转成数字类型才能使用
+
+#### 8.5 Hello World Pro-2
+
+增加选项配置，像我们平常用的 ls 命令，我们可以在后面加入不同的选项就可以实现不一样的  功能。
+
+进入目录 `base_linux/hello/hello_opt` 
+
+```bash
+cd base_linux/hello/hello_opt
+```
+
+使用 Vim 创建并编辑文件 `hello_opt.c`
+
+```bash
+vim hello_opt.c
+```
+
+```c
+
+```
 
 
 
