@@ -699,6 +699,8 @@ source hello_world.sh
     git log
     ```
 
+    - `git log` 页面按 `q` 退出
+
 6. 根据提交的 ID 查看某一个提交的详细信息
 
     ```shell
@@ -857,20 +859,28 @@ git clone git@github.com:SprInec/LinuxLearn.git
 
     - `-m "MESSAGE"` ：提交信息
 
+6. 再次拉取远程更新
 
-6. 将本地提交推送到远程仓库
+    ```bash
+    git pull
+    ```
+
+
+7. 将本地提交推送到远程仓库
 
     ```shell
     git push
     ```
 
-7. 查看提交历史
+8. 查看提交历史
 
     ```shell
     git log
     ```
 
-8. 根据提交的 ID 查看某一个提交的详细信息
+    - `git log` 页面按 `q` 退出
+
+9. 根据提交的 ID 查看某一个提交的详细信息
 
     ```shell
     git show COMMIT_ID
@@ -888,62 +898,73 @@ graph TD;
     F -->|git add .| G[添加文件]
     G -->|git commit| H[提交更改]
     H --> |git log| R1[查看历史记录]
+    R1 --> |git show COMMIT_ID| S1[根据ID查看某一个提交的详细信息]
     
     C -->|git config| E
     E -->|git status| L[查看状态]
-    L -->|git pull origin <branch>| M[拉取远程更新]
+    L -->|git pull| M[拉取远程更新]
     M --> N[进行本地修改]
     N -->|git add .| O[添加更改]
     O -->|git commit| P[提交更改]
-    P -->|git push| Q[推送到远程]
+    P --> |git pull| M2[再次拉取远程更新]
+    M2 -->|git push| Q[推送到远程]
     Q -->|git log| R2[查看历史记录]
+    R2 --> |git show COMMIT_ID| S2[根据ID查看某一个提交的详细信息]
 ```
 
-**1. 创建或克隆仓库**：
+**1. 创建或克隆仓库**
 
 - 使用 `git init` 创建新的本地仓库。
 - 使用 `git clone <repo-url>` 克隆现有的远程仓库。
 
-**2. 配置用户信息**（如果是新仓库）：
+**2. 配置用户信息**（如果是新仓库）
 
 ```bash
 git config --global user.name "Your Name"
 git config --global user.email "your_email@example.com"
 ```
 
-**3. 查看状态**：
+**3. 查看状态**
 
 使用 `git status` 查看当前工作区和暂存区的状态。
 
-**4. 拉取远程更新**：
+**4. 拉取远程更新**
 
 使用 `git pull origin <branch-name>`  在进行本地修改之前，先拉取远程仓库的最新更改，以确保你的本地代码是最新的。这有助于避免后续推送时发生冲突。
 
-**5. 添加更改**：
+**5. 添加更改**
 
 使用 `git add <file>` 将更改添加到暂存区，或使用 `git add .` 添加所有更改。
 
-**6. 提交更改**：
+**6. 提交更改**
 
 使用 `git commit -m "Commit message"` 提交暂存区的更改。
 
-**7. 推送到远程**：
+**7. 再次拉取远程更新**
+
+使用 `git pull` 再次拉取远程仓库更新。
+
+**8. 推送到远程**
 
 使用 `git push origin <branch-name>` 将本地提交推送到远程仓库。
 
-**8. 处理分支**（可选）：
+**9. 处理分支**（可选）
 
 - 创建新分支：`git branch <branch-name>`
 - 切换分支：`git checkout <branch-name>`
 - 合并分支：`git merge <branch-name>`
 
-**9. 解决冲突**（如有）：
+**10. 解决冲突**（如有）
 
 在合并过程中可能会出现冲突，手动解决后，重新添加和提交。
 
-**10. 查看历史记录**：
+**11. 查看历史记录**
 
-使用 `git log` 查看提交历史。
+使用 `git log` 查看提交历史，`git log`  页面按 `q` 退出。
+
+**12. 根据某个 ID 查看详细的提交信息**
+
+从`git log` 显示的信息中获取想要查看的 `COMMIT_ID` 使用  `git show COMMIT_ID` 命令进行查看。
 
 #### 7.5 Git 本地项目上传到 GitHub
 
@@ -951,8 +972,17 @@ git config --global user.email "your_email@example.com"
 
 ##### 1. 创建 GitHub 仓库
 
-- 登录到 GitHub，点击右上角的 `+` 图标，然后选择 `New repository` 。
-- 输入仓库名称和描述，选择是否公开或私有，最后点击 `Create repository`。
+- 登录到 GitHub，点击左上角的 `New` 图标。
+
+    ![image-20241017155846956](.assets/image-20241017155846956.png)
+
+- 输入仓库名称，选择是否公开或私有，最后点击 `Create repository`。
+
+    ![image-20241017160517245](.assets/image-20241017160517245.png)
+
+- 若没有勾选 `Add a README file` 创建好仓库后可能会显示以下页面
+
+    ![image-20241017161108916](.assets/image-20241017161108916.png)
 
 ##### 2. 在本地仓库中添加远程仓库
 
@@ -975,7 +1005,15 @@ git add .
 git commit -m "first commit"
 ```
 
-##### 4. 推送到 GitHub
+##### 4. 查看当前所有分支
+
+若不清楚当前仓库的分支情况，可使用以下命令查看当前仓库所有分支：
+
+```bash
+git branch
+```
+
+##### 5. 推送到 GitHub
 
 使用以下命令将本地仓库的更改推送到 GitHub：
 
@@ -983,11 +1021,41 @@ git commit -m "first commit"
 git push -u origin master
 ```
 
+- `-u` ：它的作用是在首次推送一个分支时，建立本地分支与远程分支之间的跟踪关系。之后可以简单地使用 `git push` 和 `git pull` 而不用每次都指定远程仓库和分支名称，Git 会自动知道该推送或拉取到哪个分支。
+
 如果使用的是 `main` 分支，替换为：
 
 ```bash
 git push -u origin main
 ```
+
+> **:bulb: NOTE**
+>
+> **1. 首次推送到新的远程分支：** 可以使用 `git push -u origin <分支名>`，这样会创建本地分支与远程分支之间的跟踪关系。
+>
+> ```bash
+> git push -u origin feature-branch
+> ```
+>
+> 之后，在这个分支上只需要输入 `git push` 就可以推送到远程的 `feature-branch`。
+>
+> **2. 仅推送一次到特定分支：** 如果不想建立长期跟踪关系，只想推送一次到远程分支，可以省略 `-u`，直接执行：
+>
+> ```bash
+> git push origin feature-branch
+> ```
+>
+> **3. 推送本地分支到远程不同名称的分支：** 如果本地分支和远程分支名称不同，可以使用以下命令：
+>
+> ```bash
+> git push origin <本地分支名>:<远程分支名>
+> ```
+>
+> 例如，将本地的 `dev-branch` 推送到远程的 `main` 分支：
+>
+> ```bash
+> git push origin dev-branch:main
+> ```
 
 #### 7.6 常用 Git 命令
 
@@ -1025,6 +1093,279 @@ git push -u origin main
 - `git checkout -- <file>` ：撤销未暂存的修改
 
 - `git reset HEAD~1` ：撤销最近一次提交（保留修改）
+
+### 8. 程序编译
+
+#### 8.1 GCC 编译工具链
+
+GCC 编译工具链（toolchain）是指以 GCC 编译器为核心的一整套工具，用于把源代码转化成可  执行应用程序。它主要包含以下三部分内容:
+
+- `gcc-core`：即 GCC 编译器,用于完成预处理和编译过程，例如把 C 代码转换成汇编代码。
+- `Binutils`：除 GCC 编译器外的一系列小工具包括了链接器 `ld`，汇编器 `as`，目标文件格式查看器 `readelf` 等。
+- `glibc`：包含了主要的 C 语言标准函数库，C 语言中常常使用的打印函数 `printf`、`malloc` 函数就在 `glibc` 库中
+
+在很多场合下会直接用 GCC 编译器来指代整套 GCC 编译工具链。
+
+##### 8.1.1 GCC 编译器
+
+GCC（GNU Compiler Collection）是由 GNU 开发的编程语言编译器。是历史上最优秀的编译器，其执行效率与一般的编译器相比平均效率要高 20%~30%。
+
+安装 gcc 编译器：
+
+```bash
+sudo apt install gcc
+```
+
+查看 gcc 版本及所在位置：
+
+```bash
+gcc -v
+which gcc
+```
+
+![image-20241017153644406](.assets/image-20241017153644406.png)
+
+- `Target: aarch64-linux-gnu` ：表示该 GCC 的目标平台为 ARM64 位架构，表示它编译生成的应用程序只适用于 ARM 板卡平台，不适用于 x86 架构。
+
+- `gcc version 11.4.0` ：表明该 GCC 的版本为 11.4.0，部分程序可能会对编译器版本有要求，同样的，编译指定版本的 uboot、Linux 内核的时候可能会对 GCC 有版本要求。
+
+##### 8.1.2 Binutils 工具集
+
+Binutils（ bin utility ），是 GNU 二进制工具集，通常跟 GCC 编译器一起打包安装到系统，它的官方说明网站地址为:https://www.gnu.org/software/binutils/ 。
+
+在进行程序开发的时候通常不会直接调用这些工具，而是在使用 GCC 编译指令的时候由 GCC 编  译器间接调用。下面是其中一些常用的工具：
+
+- `as` ：**汇编器**，把汇编语言代码转化为机器码（目标文件）。
+- `ld` ：**链接器**，把编译生成的多个目标文件组织成最终的可执行文件。
+- `readelf` ：可用于查看目标文件或可执行程序文件的信息。
+- `nm` ：可用于查看目标文件中出现的符号。
+- `objcopy` ：可用于目标文件格式转换，如 `.bin` 转换为 `.elf` 、`.elf` 转换成 `.bin` 等。
+- `objdump` ：可用于查看目标文件的信息，最主要的作用是**反汇编**。
+- `size` ：可用于查看目标文件不同部分的尺寸和总尺寸，例如代码段大小、数据段大小、使用的静态内存、总大小等。
+
+系统默认的 Binutils 工具集位于 `/usr/bin`  目录下，可使用如下命令查看系统中存在的 Binutils 工具集：
+
+```bash
+ls /usr/bin/ | grep linux-gnu-
+```
+
+![image-20241017154856366](.assets/image-20241017154856366.png)
+
+图中列出的是 Binutils 工具的完整名字，在终端中使用时通常直接使用它们的别名即可。
+
+##### 8.1.3 glibc 库
+
+glibc 库是 GNU 组织为 GNU 系统以及 Linux 系统编写的 C 语言标准库，因为绝大部分 C 程序都依赖该函数库，该文件甚至会直接影响到系统的正常运行，例如常用的文件操作函数 `read`、`write`、  `open`，打印函数 `printf`、动态内存申请函数 `malloc` 等。
+
+在 Ubuntu 系统下，`libc.so.6` 是 glibc 的库文件，可直接执行该库文件查看版本，在主机上执行如下命令:
+
+```bash
+# 以下是 Ubuntu 64 位机的 glibc 库文件路径, 可直接执行
+/lib/aarch64-linux-gnu/libc.so.6
+```
+
+glibc 的官网地址为：https://www.gnu.org/software/libc/
+
+#### 8.2 Hello World
+
+##### 8.2.1 创建工作目录
+
+使用以下命令构建工作目录结构：
+
+```bash
+mkdir base_linux
+cd base_linux
+
+mkdir hello
+cd hello
+
+mkdir hello hello_arg hello_opt
+```
+
+工作目录结构如下:
+
+```bash
+base_linux
+└── hello <-当前位置
+    ├── hello
+    ├── hello_arg
+    └── hello_opt
+```
+
+##### 8.2.2 编写代码文件
+
+进入目标目录 `base_linux/hello/hello`：
+
+```bash
+cd hello
+```
+
+使用 Vim 新建一个名为 `hello.c` 的文件：
+
+```bash
+vim hello.c
+```
+
+输入以下代码并保存：
+
+```c
+#include "stdio.h"
+
+int main()
+{
+        int i;
+        printf("hello, world! This is a C program.\n");
+        for (int i = 0; i < 10; i++){
+                printf("output i=%d\n",i);
+        }
+
+        return 0;
+}
+```
+
+##### 8.2.3 编译并执行
+
+使用 gcc 把 `hello.c` 编译成 `hello` 程序
+
+```bash
+gcc hello.c -o hello
+```
+
+查看目录下文件：
+
+```bash
+ls
+```
+
+![image-20241017164550962](.assets/image-20241017164550962.png)
+
+执行生成的 `hello` 程序：
+
+```bash
+./hello
+```
+
+![image-20241017164649526](.assets/image-20241017164649526.png)
+
+#### 8.3 GCC 编译过程
+
+##### 8.3.1 基本语法
+
+GCC 命令语法如下：
+
+```bash
+gcc <option> <file_name>
+```
+
+常用选项 <option>：
+
+- `-o` ：小写字母 `o`，指定生成的可执行文件的名字，不指定的话生成的可执行文件名为 `a.out`。
+- `-E` ：只进行预处理，既不编译，也不汇编。
+- `-S` ：只编译、不汇编。
+- `-c` ：编译并汇编，但不进行链接。
+- `-g` ：生成的可执行文件带调试信息，方便使用 `gdb` 进行调试。
+- `-Ox` ：大写字母 `O` 加数字，设置程序的优化等级，如 `-O0`  `-O1`  `-O2`  `-O3`，数字越大代码的优化等级越高，编译出来的程序一般会越小，但有可能会导致程序不正常运行。
+
+##### 8.3.2 编译过程
+
+GCC 编译选项除了`-g` 和 `-Ox` 选项，其它选项实际上都是编译的分步骤，即只进行某些编译过程。
+
+直接编译成可执行文件：
+
+```bash
+gcc hello.c -o hello
+```
+
+以上命令等价于执行以下全部操作：
+
+1. **预处理**，可理解为把头文件的代码汇总成 C 代码，把 `*.c` 转换得到 `*.i` 文件
+
+    ```bash
+    gcc -E hello.c -o hello.i
+    ```
+
+2. **编译**，可理解为把 C 代码转换为汇编代码，把 `*.i` 转换得到 `*.s` 文件
+
+    ```bash
+    gcc -S hello.i -o hello.s
+    ```
+
+    也可直接以 C 文件作为输入进行编译，与上面的命令是等价的：
+
+    ```bash
+    gcc -S hello.c -o hello.s
+    ```
+
+3. **汇编**，可理解为把汇编代码转换为机器码，把 `*.s` 转换得到 `*.o`，即目标文件
+
+    ```bash
+    gcc -c hello.s -o hello.o
+    ```
+
+    也可以直接以 C 文件作为输入进行汇编，与上面的命令是等价的：
+
+    ```bash
+    gcc -c hello.c -o hello.o
+    ```
+
+    - `.o` 是为了让计算机阅读的，如果直接使用编辑器打开，只会看到乱码。
+
+    - Linux 下生成的 `*.o` 目标文件、`*.so` 动态库文件以及下一小节链接阶段生成最终的可执行文件都是 `elf` 格式的，可以使用 `readelf` 工具来查看它们的内容。
+
+        ```bash
+        readelf -a hello.o
+        ```
+
+        从 readelf 的工具输出的信息，可以了解到目标文件包含 ELF 头、程序头、节等内容
+
+4. **链接**，把不同文件之间的调用关系链接起来，把一个或多个 `*.o` 转换成最终的可执行文件
+
+    ```bash
+    gcc hello.o -o hello
+    ```
+
+GCC 编译工具链在编译一个 C 源文件时需要经过以下 4 步:
+
+1. **预处理**：在预处理过程中，对源代码文件中的文件包含 (include)、预编译语句 (如宏定义  define 等) 进行展开，生成 `.i`  文件。可理解为把头文件的代码、宏之类的内容转换成更纯粹的 C 代码，不过生成的文件以 `.i` 为后缀。
+2. **编译**：把预处理后的 `.i` 文件通过编译成为汇编语言，生成 `.s` 文件，即把代码从 C 语言转换成汇编语言，这是 GCC 编译器完成的工作。
+3. **汇编**：将汇编语言文件经过汇编，生成目标文件`.o` 文件，每一个源文件都对应一个目标文件。即把汇编语言的代码转换成机器码，这是 `as` 汇编器完成的工作。
+4. **链接**：最后将每个源文件对应的 `.o` 文件链接起来，就生成一个可执行程序文件，这是链接  器 `ld` 完成的工作。
+
+<img src=".assets/image-20241017173250099.png" alt="image-20241017173250099" style="zoom:50%;" />
+
+##### 8.3.3 链接的两种类型
+
+- **动态链接**：GCC 编译时的默认选项。动态是指在应用程序运行时才去加载外部的代码库,  例如 `printf` 函数的 C 标准代码库 `*.so` 文件存储在 Linux 系统的某个位置，`hello` 程序执行时调用库文件 `*.so` 中的内容，不同的程序可以共用代码库。所以动态链接生成的程序比较小，占用较少的内存。
+
+    ```bash
+    gcc hello.c -o hello
+    ```
+
+- **静态链接**：链接时使用选项 `–static`，它在编译阶段就会把所有用到的库打包到自己的可  执行程序中。所以静态链接的优点是具有较好的兼容性，不依赖外部环境，但是生成的程序比较大。
+
+    ```bash
+    gcc hello.c -o hello_static --static
+    ```
+
+    ![image-20241017175710487](.assets/image-20241017175710487.png)
+
+在 Ubuntu 下，可以使用 `ldd` 工具查看动态文件的库依赖：
+
+```bash
+ldd hello
+ldd hello_static
+```
+
+![image-20241017180045320](.assets/image-20241017180045320.png)
+
+可以看到，动态链接生成的 `hello` 程序依赖于库文件 `linux-vdso.so.1`、`libc.so.6` 以及 `ld-linuxaarch64.so.1`，其中的 `libc.so.6` 就是 C 标准代码库，程序中调用了它的 `printf`  库函数。 
+
+ 静态链接生成的 `hello_static` 没有依赖外部库文件。
+
+#### 8.4 Hello World Pro-1
+
+
+
 
 
 
@@ -1273,6 +1614,8 @@ sudo apt-get install open-vm-tools-desktop
 
 ### VMWare 虚拟机共享文件夹不显示
 
+- [x] 2024.10.15 22:57
+
 > **参考博客：** [虚拟机设置共享文件夹添加不显示](https://blog.csdn.net/qq_41880069/article/details/86158454)
 
 1. 确保 `open-vm-tools` 及 `open-vm-tools-desktop` 已安装
@@ -1318,6 +1661,8 @@ ls
 
 
 ### Vim Ctrl+z 强制退出后再次进入显示 E325：注意
+
+- [x] 2024.10.17 1:26
 
 当使用 `Ctrl + z` 强制退出 Vim 后，再次进入出现以下界面
 
