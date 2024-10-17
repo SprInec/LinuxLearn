@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/*
+/**
  * @brief: 打印帮助信息
  */
 void usage(const char *argv_0)
@@ -17,7 +17,7 @@ void usage(const char *argv_0)
 	exit(1);
 }
 
-/*
+/**
  * @brief: 打印 n 个 * 号
  */
 void d_option(char *num_str)
