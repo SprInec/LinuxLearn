@@ -951,8 +951,17 @@ git config --global user.email "your_email@example.com"
 
 ##### 1. 创建 GitHub 仓库
 
-- 登录到 GitHub，点击右上角的 `+` 图标，然后选择 `New repository` 。
-- 输入仓库名称和描述，选择是否公开或私有，最后点击 `Create repository`。
+- 登录到 GitHub，点击左上角的 `New` 图标。
+
+    ![image-20241017155846956](.assets/image-20241017155846956.png)
+
+- 输入仓库名称，选择是否公开或私有，最后点击 `Create repository`。
+
+    ![image-20241017160517245](.assets/image-20241017160517245.png)
+
+- 若没有勾选 `Add a README file` 创建好仓库后可能会显示以下页面
+
+    ![image-20241017161108916](.assets/image-20241017161108916.png)
 
 ##### 2. 在本地仓库中添加远程仓库
 
@@ -975,7 +984,15 @@ git add .
 git commit -m "first commit"
 ```
 
-##### 4. 推送到 GitHub
+##### 4. 查看当前所有分支
+
+若不清楚当前仓库的分支情况，可使用以下命令查看当前仓库所有分支：
+
+```bash
+git branch
+```
+
+##### 5. 推送到 GitHub
 
 使用以下命令将本地仓库的更改推送到 GitHub：
 
@@ -983,11 +1000,41 @@ git commit -m "first commit"
 git push -u origin master
 ```
 
+- `-u` ：它的作用是在首次推送一个分支时，建立本地分支与远程分支之间的跟踪关系。之后可以简单地使用 `git push` 和 `git pull` 而不用每次都指定远程仓库和分支名称，Git 会自动知道该推送或拉取到哪个分支。
+
 如果使用的是 `main` 分支，替换为：
 
 ```bash
 git push -u origin main
 ```
+
+> **:bulb: NOTE**
+>
+> **1. 首次推送到新的远程分支：** 可以使用 `git push -u origin <分支名>`，这样会创建本地分支与远程分支之间的跟踪关系。
+>
+> ```bash
+> git push -u origin feature-branch
+> ```
+>
+> 之后，在这个分支上只需要输入 `git push` 就可以推送到远程的 `feature-branch`。
+>
+> **2. 仅推送一次到特定分支：** 如果不想建立长期跟踪关系，只想推送一次到远程分支，可以省略 `-u`，直接执行：
+>
+> ```bash
+> git push origin feature-branch
+> ```
+>
+> **3. 推送本地分支到远程不同名称的分支：** 如果本地分支和远程分支名称不同，可以使用以下命令：
+>
+> ```bash
+> git push origin <本地分支名>:<远程分支名>
+> ```
+>
+> 例如，将本地的 `dev-branch` 推送到远程的 `main` 分支：
+>
+> ```bash
+> git push origin dev-branch:main
+> ```
 
 #### 7.6 常用 Git 命令
 
@@ -1025,6 +1072,175 @@ git push -u origin main
 - `git checkout -- <file>` ：撤销未暂存的修改
 
 - `git reset HEAD~1` ：撤销最近一次提交（保留修改）
+
+### 8. 程序编译
+
+#### 8.1 GCC 编译工具链
+
+GCC 编译工具链（toolchain）是指以 GCC 编译器为核心的一整套工具，用于把源代码转化成可  执行应用程序。它主要包含以下三部分内容:
+
+- `gcc-core`：即 GCC 编译器,用于完成预处理和编译过程，例如把 C 代码转换成汇编代码。
+- `Binutils`：除 GCC 编译器外的一系列小工具包括了链接器 `ld`，汇编器 `as`，目标文件格式查看器 `readelf` 等。
+- `glibc`：包含了主要的 C 语言标准函数库，C 语言中常常使用的打印函数 `printf`、`malloc` 函数就在 `glibc` 库中
+
+在很多场合下会直接用 GCC 编译器来指代整套 GCC 编译工具链。
+
+##### 8.1.1 GCC 编译器
+
+GCC（GNU Compiler Collection）是由 GNU 开发的编程语言编译器。是历史上最优秀的编译器，其执行效率与一般的编译器相比平均效率要高 20%~30%。
+
+安装 gcc 编译器：
+
+```bash
+sudo apt install gcc
+```
+
+查看 gcc 版本及所在位置：
+
+```bash
+gcc -v
+which gcc
+```
+
+![image-20241017153644406](.assets/image-20241017153644406.png)
+
+- `Target: aarch64-linux-gnu` ：表示该 GCC 的目标平台为 ARM64 位架构，表示它编译生成的应用程序只适用于 ARM 板卡平台，不适用于 x86 架构。
+
+- `gcc version 11.4.0` ：表明该 GCC 的版本为 11.4.0，部分程序可能会对编译器版本有要求，同样的，编译指定版本的 uboot、Linux 内核的时候可能会对 GCC 有版本要求。
+
+##### 8.1.2 Binutils 工具集
+
+Binutils（ bin utility ），是 GNU 二进制工具集，通常跟 GCC 编译器一起打包安装到系统，它的官方说明网站地址为:https://www.gnu.org/software/binutils/ 。
+
+在进行程序开发的时候通常不会直接调用这些工具，而是在使用 GCC 编译指令的时候由 GCC 编  译器间接调用。下面是其中一些常用的工具：
+
+- `as` ：**汇编器**，把汇编语言代码转化为机器码（目标文件）。
+- `ld` ：**链接器**，把编译生成的多个目标文件组织成最终的可执行文件。
+- `readelf` ：可用于查看目标文件或可执行程序文件的信息。
+- `nm` ：可用于查看目标文件中出现的符号。
+- `objcopy` ：可用于目标文件格式转换，如 `.bin` 转换为 `.elf` 、`.elf` 转换成 `.bin` 等。
+- `objdump` ：可用于查看目标文件的信息，最主要的作用是**反汇编**。
+- `size` ：可用于查看目标文件不同部分的尺寸和总尺寸，例如代码段大小、数据段大小、使用的静态内存、总大小等。
+
+系统默认的 Binutils 工具集位于 `/usr/bin`  目录下，可使用如下命令查看系统中存在的 Binutils 工具集：
+
+```bash
+ls /usr/bin/ | grep linux-gnu-
+```
+
+![image-20241017154856366](.assets/image-20241017154856366.png)
+
+图中列出的是 Binutils 工具的完整名字，在终端中使用时通常直接使用它们的别名即可。
+
+##### 8.1.3 glibc 库
+
+glibc 库是 GNU 组织为 GNU 系统以及 Linux 系统编写的 C 语言标准库，因为绝大部分 C 程序都依赖该函数库，该文件甚至会直接影响到系统的正常运行，例如常用的文件操作函数 `read`、`write`、  `open`，打印函数 `printf`、动态内存申请函数 `malloc` 等。
+
+在 Ubuntu 系统下，`libc.so.6` 是 glibc 的库文件，可直接执行该库文件查看版本，在主机上执行如下命令:
+
+```bash
+# 以下是 Ubuntu 64 位机的 glibc 库文件路径, 可直接执行
+/lib/aarch64-linux-gnu/libc.so.6
+```
+
+glibc 的官网地址为：https://www.gnu.org/software/libc/
+
+#### 8.2 Hello World
+
+##### 8.2.1 创建工作目录
+
+使用以下命令构建工作目录结构：
+
+```bash
+mkdir base_linux
+cd base_linux
+
+mkdir hello
+cd hello
+
+mkdir hello hello_arg hello_opt
+```
+
+工作目录结构如下:
+
+```bash
+base_linux
+└── hello <-当前位置
+    ├── hello
+    ├── hello_arg
+    └── hello_opt
+```
+
+##### 8.2.2 编写代码文件
+
+进入目标目录 `base_linux/hello/hello`：
+
+```bash
+cd hello
+```
+
+使用 Vim 新建一个名为 `hello.c` 的文件：
+
+```bash
+vim hello.c
+```
+
+输入以下代码并保存：
+
+```c
+#include "stdio.h"
+
+int main()
+{
+        int i;
+        printf("hello, world! This is a C program.\n");
+        for (int i = 0; i < 10; i++){
+                printf("output i=%d\n",i);
+        }
+
+        return 0;
+}
+```
+
+##### 8.2.3 编译并执行
+
+使用 gcc 把 `hello.c` 编译成 `hello` 程序
+
+```bash
+gcc hello.c -o hello
+```
+
+查看目录下文件：
+
+```bash
+ls
+```
+
+![image-20241017164550962](.assets/image-20241017164550962.png)
+
+执行生成的 `hello` 程序：
+
+```bash
+./hello
+```
+
+![image-20241017164649526](.assets/image-20241017164649526.png)
+
+#### 8.3 GCC 编译过程
+
+##### 8.3.1 基本语法
+
+GCC 命令语法如下：
+
+```bash
+gcc <option> <file_name>
+```
+
+常用选项 <option>：
+
+- `-o` ：小写字母 `o`，指定生成的可执行文件的名字，不指定的话生成的可执行文件名为 `a.out`。
+- `-E` ：只进行预处理，既不编译，也不汇编。
+
 
 
 
@@ -1273,6 +1489,8 @@ sudo apt-get install open-vm-tools-desktop
 
 ### VMWare 虚拟机共享文件夹不显示
 
+- [x] 2024.10.15 22:57
+
 > **参考博客：** [虚拟机设置共享文件夹添加不显示](https://blog.csdn.net/qq_41880069/article/details/86158454)
 
 1. 确保 `open-vm-tools` 及 `open-vm-tools-desktop` 已安装
@@ -1318,6 +1536,8 @@ ls
 
 
 ### Vim Ctrl+z 强制退出后再次进入显示 E325：注意
+
+- [x] 2024.10.17 1:26
 
 当使用 `Ctrl + z` 强制退出 Vim 后，再次进入出现以下界面
 
