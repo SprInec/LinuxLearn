@@ -11,8 +11,8 @@ void usage(const char *argv_0)
 	printf("\nUsage %s: [-option] \n", argv_0);
 	printf("[-a] hello!\n");
 	printf("[-b] I am LubanCat\n");
-	printf("[-c<str>] str\n");
-	printf("[-d<num>] printf num of '*' (num<100)\n");
+	printf("[-c <str>] str\n");
+	printf("[-d <num>] printf num of '*' (num < 100)\n");
 	printf("[-h] get help\n");
 	exit(1);
 }
@@ -45,56 +45,56 @@ int main(int argc, char **argv)
 	{
 		switch (opt)
 		{
-			case 'a':
-				printf("hello!\n");
-				break;
-			case 'b':
-				printf("I am LubanCat\n");
-				break;
-			case 'c':
-				if (optarg)
-				{
-					if (optarg[0] == '-')
-					{
-						usage(argv[0]);
-					}
-					else
-					{
-						printf("%s\n", optarg);
-					}
-				}
-				else
+		case 'a':
+			printf("hello!\n");
+			break;
+		case 'b':
+			printf("I am LubanCat\n");
+			break;
+		case 'c':
+			if (optarg)
+			{
+				if (optarg[0] == '-')
 				{
 					usage(argv[0]);
 				}
-				break;
-			case 'd':
-				if (optarg)
-				{
-					if (optarg[0] == '-')
-					{
-						usage(argv[0]);
-					}
-					else
-					{
-						if (strlen(optarg))
-						{
-							d_option(optarg);
-						}
-						else
-						{
-							usage(argv[0]);
-						}
-					}
-				}
 				else
 				{
-					usage(argv[0]);
-				}	
-				break;
-			default: 
+					printf("%s\n", optarg);
+				}
+			}
+			else
+			{
 				usage(argv[0]);
-				break;
+			}
+			break;
+		case 'd':
+			if (optarg)
+			{
+				if (optarg[0] == '-')
+				{
+					usage(argv[0]);
+				}
+				else
+				{
+					if (strlen(optarg))
+					{
+						d_option(optarg);
+					}
+					else
+					{
+						usage(argv[0]);
+					}
+				}
+			}
+			else
+			{
+				usage(argv[0]);
+			}
+			break;
+		default:
+			usage(argv[0]);
+			break;
 		}
 	}
 
