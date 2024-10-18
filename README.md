@@ -1468,8 +1468,8 @@ void usage(const char *argv_0)
         printf("\nUsage %s: [-option] \n", argv_0);
         printf("[-a] hello!\n");
         printf("[-b] I am LubanCat\n");
-        printf("[-c<str>] str\n");
-        printf("[-d<num>] printf num of '*' (num<100)\n");
+        printf("[-c <str>] str\n");
+        printf("[-d <num>] printf num of '*' (num<100)\n");
         printf("[-h] get help\n");
         exit(1);
 }
@@ -1574,6 +1574,16 @@ gcc hello_opt.c -o hello_opt
 ./hello_opt -abcd
 ./hello_opt -h
 ```
+
+![image-20241018094036851](.assets/image-20241018094036851.png)
+
+### 9. Linux 系统下的程序
+
+#### 9.1 Linux 系统下的 Hello World
+
+Linux 系统下， `hello_world` 程序的流程图如下：
+
+<img src=".assets/image-20241018125038794.png" alt="image-20241018125038794" style="zoom:50%;" />
 
 
 
