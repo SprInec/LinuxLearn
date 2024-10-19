@@ -295,7 +295,7 @@ sudo ufw allow ssh
 
 然后即可通过命令 `ssh username@server_ip` 从客户端连接到板卡/虚拟机/服务器了，也可通过 Tabby、MobaXterm、PuTTY、electerm、FinalShell、Hyper、SecureCRT、Termius 或是安装了 Remote SSH 插件的 VScode 进行 SSH 远程连接。
 
-比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。
+比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。其中若想给 VSCode 配置 SSH 免密远程登陆可查看 **OTHER - [VSCode 配置 SSH 免密远程登陆](###VSCode 配置 SSH 免密远程登陆)** 。
 
 - Tabby
 
@@ -317,11 +317,11 @@ sudo ufw allow ssh
 
 - `ls` ：列出当前目录的文件
     - `ls [目录名]` ：列出其他文件的目录
-    - `-a` ：显示所有文件及目录 (ls 内定将文件名或目录名称开头为“.”的视为隐藏档,不会列出)
-    - `-l` ：除文件名称外,将文件型态、权限、拥有者、文件大小等信  息详细列出
+    - `-a` ：显示所有文件及目录 (ls 内定将文件名或目录名称开头为 “ . ” 的视为隐藏档，不会列出)
+    - `-l` ：除文件名称外，将文件型态、权限、拥有者、文件大小等信息详细列出
     - `-t` ：将文件依建立时间之先后次序列出
     - `-A` ：同 -a ,但不列出 “ . ” (当前目录) 及 “ .. ” (父目录)
-    - `-R` ：若目录下有文件,则该目录下的文件也会列出,即递归显示
+    - `-R` ：若目录下有文件，则该目录下的文件也会列出，即递归显示
     
 - `pwd` ：列出当前目录的位置
 
@@ -348,8 +348,8 @@ sudo ufw allow ssh
 
 - `rm [-option] [一个或多个文件/文件夹名]` ：删除一个或多个文件或目录
     - `-R/r` ：递归处理
-    - `-i` ：删除文件或文件夹前,终端会逐一询问确认
-    - `-f` ：忽略不存在的文件,无需逐一确认
+    - `-i` ：删除文件或文件夹前，终端会逐一询问确认
+    - `-f` ：忽略不存在的文件，无需逐一确认
 
 - `which [xxx]` ：查找并显示给定命令的绝对路径
 
@@ -414,7 +414,7 @@ id
 
 上图中的 gid 用于标识当前用户所在的分组(Group)，每个用户可以对应多个分组。
 
-Linux 系统拥有多个分组,每个用户分组就相当社团，用户如果是多个用户组 的成员，就可以访问其他分组对应的文件，前提是该分组的文件允许其他用户访问，这就需要了  解另一个知识点：文件权限。
+Linux 系统拥有多个分组，每个用户分组就相当社团，用户如果是多个用户组 的成员，就可以访问其他分组对应的文件，前提是该分组的文件允许其他用户访问，这就需要了解另一个知识点：文件权限。
 
 <img src=".assets/image-20241016222016169.png" alt="image-20241016222016169" style="zoom:35%;" />
 
@@ -424,7 +424,7 @@ Linux 一切皆文件
 
 **Linux 的文件属性：**可以分为读权限、写权限、执行权限。
 
-**Linux 文件权限**分三种情况：文件拥有者(owner)，分组成员(groups)  以及其他分组成员(other)。
+**Linux 文件权限**分三种情况：文件拥有者 ( owner )，分组成员 ( groups )  以及其他分组成员 ( other )。
 
 使用以下命令查看当前目录的文件权限
 
@@ -449,7 +449,7 @@ drwxr-xr-x 2 cat cat 4096 Feb 14 2019 Desktop
     文件属性共有十个字符，第一个字符代表文件的类型
 
     - `-` ：表示该文件是一个普通文件
-    - `d` ：dirtectory（目录）的首字符,表示该文件是一个目录
+    - `d` ：dirtectory（目录）的首字符，表示该文件是一个目录
     - `I` ：表示该文件是个链接文件
 
     后面的九个字符，每三个为一组，分别表示**文件拥有者的权限**、**文件所属组拥有的权限**以及**其他用户拥有的权限**。
@@ -470,7 +470,7 @@ drwxr-xr-x 2 cat cat 4096 Feb 14 2019 Desktop
 
 #### 4.3 chmod 命令
 
-文件的权限由三部分组成，每个部分都对应着三种文件权限，可读、可写、可执行
+文件的权限由三部分组成，每个部分都对应着三种文件权限，可读、可写、可执行。
 
 `rwx` 在二进制中的数值可以看成
 
@@ -498,7 +498,7 @@ sudo chmod xxx [文件名]
 - `xxx = 777` 则文件权限变为了 `-rwxrwxrwx`
 - `xxx = 666` 则文件权限变为了 `-rw-rw-rw-`
 
-若要单独给用户，组，其他用户设置权限则使用以下命令
+若要单独给用户、组、其他用户设置权限则使用以下命令
 
 ```shell
 sudo chmod [ugoa][+-][rwx] [文件名]
@@ -585,7 +585,7 @@ ls /
 
 ### 6. Vi/Vim 编辑器
 
-大部分 Linux 系统中都会自带 Vi 编辑器已方便用户在终端上编辑文件，而 Vim 是 Vi 的升级版  本，它在 Vi 的基础上改进和增加了很多特性,是一个功能更强大、高度可定制的文本编辑器。
+大部分 Linux 系统中都会自带 Vi 编辑器已方便用户在终端上编辑文件，而 Vim 是 Vi 的升级版本，它在 Vi 的基础上改进和增加了很多特性,是一个功能更强大、高度可定制的文本编辑器。
 
 #### 6.1 Vim 使用演示
 
@@ -615,7 +615,7 @@ vim 文件名
 
     ![image-20241017010225406](.assets/image-20241017010225406.png)
 
-    具体处理方式请看 **ERROR LOG - Vim Ctrl+z 强制退出后再次进入显示 E325：注意**
+    具体处理方式请看 **ERROR LOG - [Vim Ctrl+z 强制退出后再次进入显示 E325：注意](###Vim Ctrl+z 强制退出后再次进入显示 E325：注意)**
 
 2. 在**命令行模式**下输入退出命令退出
 
@@ -1929,7 +1929,7 @@ ls
 
 ![image-20241019172445941](.assets/image-20241019172445941.png)
 
-##### 10.3.3 目标与依赖
+#### 10.4 目标与依赖
 
 Makefile 中跟目标相关的语法：
 
@@ -1950,19 +1950,57 @@ Makefile 中跟目标相关的语法：
 
 - **命令 1，命令 2 ⋯ 命令 n** ：make 达成目标所需要的命令。只有当目标不存在或依赖文件的修改时间比目标文件还要新时，才会执行命令。要特别注意**命令的开头要用 `Tab` 键，不能使用空格代替**，有的编辑器会把 `Tab` 键自动转换成空格导致出错，若出现这种情况请检查自己的编辑器配置。
 
-##### 10.3.4 伪目标
+#### 10.5 伪目标
 
+前面我们在 Makefile 中编写的目标，在 make 看来其实都是目标文件，例如 make 在执行的时候由于在目录找不到 `targeta` 文件，所以每次 `make targeta` 的时候，它都会去执行 `targeta` 的命令，期待执行后能得到名为 `targeta` 的同名文件。如果目录下真的有 `targeta`、`targetb`、`targetc` 的文件，即假如目标文件和依赖文件都存在且是最新的，那么 `make targeta` 就不会被正常执行了，这会引起误会。
 
+Makefile 使用 **`.PHONY`** 前缀来区分目标代号和目标文件，并且这种目标代号被称为**伪目标**，phony 单词翻译过来本身就是假的意思。
 
+也就是说，只要我们不期待生成目标文件，就应该把对应的目标定义成伪目标。
 
+前面 [10.3.1](#####10.3.1 Makefile 小实验) 的演示代码修改如下：
 
+```makefile
+ # path: /makefile/test1/Makefile
+.PHONY: targeta
+targeta: targetc targetb
+	ls -lh
 
+.PHONY: targetb
+targetb:
+	touch test.txt
+	
+.PHONY: targetc
+targetc:
+	pwd
+	
+.PHONY: targetd
+targetd:
+	rm -f test.txt
+```
 
+```bash
+cd /base_linux/makefile/
+cp -r test2 test3
+cd test3
+touch clean
+```
 
+[10.3.2.2](######10.3.2.2 使用 Makefile 编译) 的演示代码修改如下:
 
+```makefile
+# path: /makefile/test3/Makefile
+hello_main: hello_main.c hello_func.c
+	gcc -o hello_main hello_main.c hello_func.c -I .
 
+.PHONY: clean
+clean:
+	rm -f *.o hello_main
+```
 
+如果以上代码中不写 `.PHONY:clean` 语句，并且在目录下创建一个名为 `clean` 的文件，那么当  执行 `make clean` 时，`clean` 的命令并不会被执行。
 
+#### 10.6 默认规则
 
 
 
