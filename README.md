@@ -224,6 +224,38 @@ ifconfig
 
 `inet` 后面跟的 xxx.xxx.xxx.xxx 即为板卡 IP 地址
 
+#### 1.3 配置 SSH 连接
+
+Windows 10 及更高版本系统自带 OpenSSH 客户端，需要确保 Linux 端已经安装 OpenSSH 服务器，可通过以下命令安装：
+
+```bash
+sudo apt update
+sudo apt install openssh-server
+```
+
+安装后启动 SSH 服务：
+
+```bash
+sudo systemctl start ssh
+sudo ststemctl enable ssh
+```
+
+检查 SSH 服务状态，确保其运行正常:
+
+```bash
+sudo systemctl status ssh
+```
+
+如有需要可能还需配置防火墙，确保服务器的防火墙允许 SSH 流量，通常 SSH 使用端口 22，可以使用以下命令打开端口：
+
+```bash
+sudo ufw allow ssh
+```
+
+然后即可通过命令 `ssh username@server_ip` 从客户端连接到板卡/虚拟机/服务器了，也可通过 Tabby Terminal、MobaXterm、PuTTY、electerm、FinalShell、Hyper、SecureCRT、Termius 或是安装了 Remote SSH 插件的 VScode 进行 SSH 远程连接。
+
+比较推荐 Tabby Terminal、Termius、安装了 Remote SSH 插件的 VScode。
+
 ### 2. Linux 命令行
 
 **命令的格式：** `command [-options] [argument]`
@@ -1637,6 +1669,8 @@ Linux 系统下， `hello_world` 程序的流程图如下：
 
 14. 程序执行完了之后，调用 `glibc` 库中的 `_exit()` 函数，来结束当前进程。
 
+### 10. Makefile 简介
+
 
 
 
@@ -1905,11 +1939,11 @@ sudo apt-get install open-vm-tools-desktop
 ssh-keygen -t rsa
 ```
 
-连续回车直到结束，找到 `.ssh` 这个文件夹，用记事本打开 `id_rsa_pub` 这个文件，并复制里面的内容。
+连续回车直到结束，找到 `.ssh` 这个文件夹，用记事本打开 `id_rsa.pub` 这个文件，并复制里面的内容。
 
 ![image-20241019093413672](.assets/image-20241019093413672.png)
 
-![image-20241019093517808](.assets/image-20241019093517808.png)
+![image-20241019095921244](.assets/image-20241019095921244.png)
 
 vscode 中通过 SSH 连接板卡，在板卡的命令行上输入以下内容：
 
