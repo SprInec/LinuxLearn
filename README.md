@@ -297,6 +297,18 @@ sudo ufw allow ssh
 
 比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。
 
+- Tabby
+
+    ![image-20241019155857626](.assets/image-20241019155857626.png)
+
+- Termius
+
+    ![image-20241019155820943](.assets/image-20241019155820943.png)
+
+- VSCode Remote SSH
+
+    ![image-20241019160205553](.assets/image-20241019160205553.png)
+
 ### 2. Linux 命令行
 
 **命令的格式：** `command [-options] [argument]`
