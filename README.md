@@ -252,9 +252,9 @@ sudo systemctl status ssh
 sudo ufw allow ssh
 ```
 
-然后即可通过命令 `ssh username@server_ip` 从客户端连接到板卡/虚拟机/服务器了，也可通过 Tabby Terminal、MobaXterm、PuTTY、electerm、FinalShell、Hyper、SecureCRT、Termius 或是安装了 Remote SSH 插件的 VScode 进行 SSH 远程连接。
+然后即可通过命令 `ssh username@server_ip` 从客户端连接到板卡/虚拟机/服务器了，也可通过 Tabby、MobaXterm、PuTTY、electerm、FinalShell、Hyper、SecureCRT、Termius 或是安装了 Remote SSH 插件的 VScode 进行 SSH 远程连接。
 
-比较推荐 Tabby Terminal、Termius、安装了 Remote SSH 插件的 VScode。
+比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。
 
 ### 2. Linux 命令行
 
@@ -1669,9 +1669,53 @@ Linux 系统下， `hello_world` 程序的流程图如下：
 
 14. 程序执行完了之后，调用 `glibc` 库中的 `_exit()` 函数，来结束当前进程。
 
-### 10. Makefile 简介
+### 10. Makefile
 
+#### 10.1 Makefile 是什么
 
+在编译单个文件时，使用以下命令即可：
+
+```bash
+gcc hello.c -o hello
+```
+
+当一个工程中有很多 C 源文件和 H 头文件时，再直接使用编译器指令就非常麻烦了，如下例:
+
+```bash
+gcc hello.c aaa.c bbb.c -o hello
+```
+
+而且哪怕只是修改一个文件，也需要重新编译所有的文件，白白浪费了很多开发时间。
+
+解决这个问题最好的方式就是把工程的编译规则写下来，让编译器自动加载该规则进行编译。解决方法就是使用 make 和 Makefile，这两个工具是搭配使用的：
+
+- **make 工具**：可以帮助我们找出项目里面修改变更过的文件，并根据依赖关系，找出受修改影响的其他相关文件，然后对这些文件按照规则进行单独的编译，这样一来就能避免重新编译项目的所有的文件。
+- **Makefile 文件**：上面提到的规则、依赖关系主要是定义在这个 Makefile 文件中的，在其中合理地定义好文件的依赖关系之后，make 工具就能精准地进行编译工作。
+
+<img src=".assets/image-20241019120122475.png" alt="image-20241019120122475" style="zoom:50%;" />
+
+管理一个项目工程，实质上就是管理项目文件间的依赖关系。在学习和使用 Makefile 的时候，一定要牢牢抓住它这种面向依赖的思想，心里一定要谨记，**Makefile 中所有的复杂、晦涩的语法都是更好地为解决依赖问题而存在的**。
+
+当工程复杂度再上一个台阶的时候，会觉得手写 Makefile 也很麻烦，那个时候可以用 CMake、autotools 等工具来帮忙生成 Makefile。
+
+<img src=".assets/image-20241019120520540.png" alt="image-20241019120520540"  />
+
+#### 10.2 常用的 Makefile 知识点
+
+<img src=".assets/Makefile 知识点.png" alt="Makefile 知识点"  />
+
+1. **基础语法：**描述目标和依赖的特定格式，Makefile 的核心。
+2. **变量**：记录特定的信息，避免重复输入原始信息，尤其是当需要手动输入的信息很长时。
+3. **分支判断**：灵活控制多个不同的编译过程，方便兼容不同属性。
+4. **头文件依赖**：监控头文件的变化，头文件也是程序的关键内容。
+5. **隐含规则**：利用 Makefile 的一些默认规则，可以减少编写 Makefile 的工作量。
+6. **自动化变量**：利用 Makefile 的默认的自动化变量，可以减少编写 Makefile 的工作量。
+7. **模式规则**：灵活使用正则表达式，减少编写 Makefile 的工作量。
+8. **函数**：使用 Makefile 的各种函数，可以更方便地实现 Makefile 的功能。
+
+Makefile 的核心在于基础语法，用来描述目标和依赖的关系。其他语法的目的，是为了减少编写 Makefile 工作量，让开发人员能够以更加优雅、更加简洁、更好维护的方式来实现 Makefile 的功能。
+
+#### 10.3 使用 Makefile 控制编译
 
 
 
