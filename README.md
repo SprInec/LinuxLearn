@@ -322,32 +322,53 @@ sudo ufw allow ssh
     - `-t` ：将文件依建立时间之先后次序列出
     - `-A` ：同 -a ,但不列出 “ . ” (当前目录) 及 “ .. ” (父目录)
     - `-R` ：若目录下有文件,则该目录下的文件也会列出,即递归显示
+    
 - `pwd` ：列出当前目录的位置
+
 - `cd` ：切换到家目录
     - `cd [目录名]` ：切换到指定目录
     - `cd -` ：切换上次切换的目录
     - `cd ~` ：切换到家目录
     - `cd ..` ：切换上一层目录
     - `cd /` ：切换到根目录
+    
 - `mkdir [name]` ：创建名为 name 的文件夹
     - `-p [name1/name2]` ：递归创建
-- `touch [name1, name2, ...]` ：创建多个文件，命名分别为 name1, name2, ...
+    
+- `touch [name1, name2, ...]` ：更新/创建多个文件，命名分别为 name1, name2, ...
+
+    `touch` 有两个功能：
+
+    1. 把已存在文件的时间标签更新为系统当前的时间（默认方式）它们的数据将原封不动地保留下来.
+    2. 用来创建新的空文件。
+
 - `cp -r a b` ：复制 *a* 文件夹重命名为 *b*
+
     - `-R/r` ：递归处理
+
 - `rm [-option] [一个或多个文件/文件夹名]` ：删除一个或多个文件或目录
     - `-R/r` ：递归处理
     - `-i` ：删除文件或文件夹前,终端会逐一询问确认
     - `-f` ：忽略不存在的文件,无需逐一确认
+
 - `which [xxx]` ：查找并显示给定命令的绝对路径
+
 - `echo` ：输出指定的字符串或者变量
+
 - `cat [文件名]` ：连接多个文件并打印到标准输出
+
 - `>`，`>>` ：输出重定向到文件
     - `命令 > 文件名` ：直接用输出覆盖原文件
     - `命令 >> 文件名` ：把输出追加到原文件的末尾
+
 - `su [用户名]` ：用于切换用户
+
 - `clear` ：清除当前屏幕终端上的任何信息
+
 - `reboot` ：系统重启
+
 - `poweroff` ：系统关机
+
 - `chmod` ：用来变更文件或目录的权限
 
 
@@ -1755,7 +1776,7 @@ gcc hello.c aaa.c bbb.c -o hello
 
 #### 10.2 常用的 Makefile 知识点
 
-<img src=".assets/Makefile 知识点.png" alt="Makefile 知识点"  />
+<img src=".assets/Makefile 知识点.png" />
 
 1. **基础语法** ：描述目标和依赖的特定格式，Makefile 的核心。
 2. **变量**：记录特定的信息，避免重复输入原始信息，尤其是当需要手动输入的信息很长时。
@@ -1820,6 +1841,160 @@ targetd:
 make 程序会根据 Makefile 中描述的目标与依赖关系，执行达成目标需要的 shell 命令。简单来说，Makefile 就是用来指导 make 程序如何干某些事情的清单。
 
 ##### 10.3.2 使用 Makefile 编译程序
+
+###### 10.3.2.1 使用 GCC 编译多个文件
+
+使用 vim 在指定路径下创建并编写以下文件：
+
+```c
+// path: /makefile/test2/hello_main.c
+#include "hello_func.h"
+
+int main(void)
+{
+    hello_func();
+    return 0;
+}
+```
+
+```c
+// path: /makefile/test2/hello_func.c
+#include <stdio.h>
+#include "hello_func.h"
+
+void hello_func(void)
+{
+        printf("hello, world! This is a C program.\n");
+        for (int i = 0; i < 10; i++)
+        {
+                printf("output i = %d\n", i);
+        }
+}
+```
+
+```c
+// path: /makefile/test2/hello_func.h
+void hello_func(void);
+```
+
+编写完成后在 `/makefile/test2/` 目录下使用 GCC 进行编译：
+
+```bash
+gcc hello_main.c hello_func.c -o hello_main -I .
+```
+
+- `-I .`  ：告诉编译器头文件路径，让它在编译时可以在 “.” (当前目录)寻找头文件
+
+运行生成的 `hello_main` 程序：
+
+```bash
+./hello_main
+```
+
+ ![image-20241019171431079](.assets/image-20241019171431079.png)
+
+###### 10.3.2.2 使用 Makefile 编译
+
+使用 vim 创建 Makefile 文件并编写如下代码:
+
+```makefile
+# path: /makefile/test2/Makefile
+hello_main: hello_main.c hello_func.c
+	gcc -o hello_main hello_main.c hello_func.c -I .
+
+clean:
+	rm -f *.o hello_main
+```
+
+使用 `make` 命令编译程序：
+
+```bash
+rm hello_main # 移除上一节 gcc 编译的程序
+ls
+
+make # 使用 make 进行编译
+ls
+
+make # 再次使用 make 编译
+
+touch hello_func.c # 更新 hello_func.c 文件时间为当前系统时间
+
+make # 再次编译
+
+make clean # 调用 make clean 清除程序
+ls
+```
+
+- make 会对目标文件和依赖进行更新检查，当依赖文件有改动时，才会再次执行命令更新目标文件。
+
+![image-20241019172445941](.assets/image-20241019172445941.png)
+
+##### 10.3.3 目标与依赖
+
+Makefile 中跟目标相关的语法：
+
+```makefile
+[目标 1]: [依赖]
+	[命令 1]
+	[命令 2]
+[目标 2]: [依赖]
+	[命令 1]
+	[命令 2]
+```
+
+- **目标** ：指 make 要做的事情，可以是一个简单的代号，也可以是目标文件，需要顶格书写，  前面不能有空格或 Tab。
+
+    一个 Makefile 可以有多个目标，写在最前面的第一个目标，会被  Make 程序确立为 *默认目标*，例如前面的 `targeta`、`hello_main`。
+
+- **依赖** ：要达成目标需要依赖的某些文件或其它目标。例如前面的 `targeta` 依赖于 `targetb` 和  `targetc`，又如在编译的例子中，`hello_main` 依赖于 `hello_main.c`、`hello_func.c` 源文件，若这些文件更新了会重新进行编译。
+
+- **命令 1，命令 2 ⋯ 命令 n** ：make 达成目标所需要的命令。只有当目标不存在或依赖文件的修改时间比目标文件还要新时，才会执行命令。要特别注意**命令的开头要用 `Tab` 键，不能使用空格代替**，有的编辑器会把 `Tab` 键自动转换成空格导致出错，若出现这种情况请检查自己的编辑器配置。
+
+##### 10.3.4 伪目标
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
