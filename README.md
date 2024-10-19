@@ -226,7 +226,15 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 
 #### 1.1 WIFI连接
 
-需使用无线串口WIFI或者安装网卡使用，硬件准备好后在 Ubuntu 桌面右上角点击找到 WIFI 连接选择连接的网络输入密码连接即可。
+需配合 USB 无线网卡或者 Mini PCIe 接口的网卡使用，若 USB 无线网卡不是免驱版则与 Mini PCIe 网卡一样，可能需要安装其对应的驱动才可使用。硬件准备好后在 Ubuntu 桌面右上角点击找到 WIFI 连接选择连接的网络输入密码连接即可。
+
+- 免驱 USB 无线网卡
+
+    <img src=".assets/ed628f4cd84245cd36193aea5a0598b.jpg" alt="ed628f4cd84245cd36193aea5a0598b" style="zoom: 50%;" />
+
+- inter5100AGN Mini PCIe 网卡 ( [驱动文件](./drivers/inter5100AGN Driver) / [驱动安装指南](./drivers/inter5100AGN Driver/README.md) )
+
+    <img src=".assets/0a67ffb28eff17889622b9cf259ae5b.jpg" alt="0a67ffb28eff17889622b9cf259ae5b" style="zoom: 50%;" />
 
 #### 1.2 网口连接
 
@@ -244,18 +252,18 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 
 <img src=".assets/image-20241016200526309.png" alt="image-20241016200526309" style="zoom: 67%;" />
 
-配置好WIFI或者网口的任意网络后，可使用以下命令查看板卡 IP 地址，从而在 PC 端进行 ssh 连接：
+配置好 WIFI 或者网口的任意网络后，可使用以下命令查看板卡 IP 地址，从而在 PC 端进行 ssh 连接：
 
-```shell
+```bash
 ifconfig
 ```
 
 - 有线网口显示为 `ethx` ，x 为 0，1， 2 ...
 
-- 无线串口 WIFI 一般显示为 `wlanx` ，x 为 0，1， 2 ...
-- 网卡一般显示为网卡的名称，如 `wlp4p65s0`
+- USB 无线网卡一般显示为 `wlanx` ，x 为 0，1， 2 ...
+- Mini PCIe 接口网卡一般显示为网卡的驱动型号，如 `wlp4p65s0`
 
-`inet` 后面跟的 xxx.xxx.xxx.xxx 即为板卡 IP 地址
+`inet` 后面跟的 xxx.xxx.xxx.xxx 即为板卡 IP 地址。
 
 #### 1.3 配置 SSH 连接
 
