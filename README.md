@@ -4,9 +4,42 @@
 
 [TOC]
 
+## 开发环境
+
+- **PC 端系统**：Windows 11
+
+- **虚拟机软件**：VMWare Workstation 17 Pro
+    - **虚拟机系统**：Ubuntu 20.04
+
+- **远程登陆工具**：Tabby 1.0.215
+- **IDE**：Visual Studio Code
+- **Markdown 编辑工具**：Typora 1.9.5
+- **版本控制系统**：Git
+- **代码托管平台**：GitHub
+
+- **Linux 开发板**：LubanCat 4
+
+    <img src=".assets/image-20241019134854554.png" alt="image-20241019134854554" style="zoom: 25%;" />
+
+    - **核心**：Rockchip RK3588S
+
+    - **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
+
+    - **硬件标注**：
+
+        - 正面视图
+
+        <img src=".assets/image-20241019135758100.png" alt="image-20241019135758100" style="zoom: 33%;" />
+
+        - 背面视图
+
+        <img src=".assets/image-20241019135831061.png" alt="image-20241019135831061" style="zoom:33%;" />
+
+
+
 ## 一. VMWare 虚拟机安装
 
->  **所选系统：** Ubuntu20.04
+>  **所选系统：** Ubuntu 20.04
 >
 >  **VMware 版本：** Workstation 17 Pro
 >
@@ -1704,7 +1737,7 @@ gcc hello.c aaa.c bbb.c -o hello
 
 <img src=".assets/Makefile 知识点.png" alt="Makefile 知识点"  />
 
-1. **基础语法：**描述目标和依赖的特定格式，Makefile 的核心。
+1. **基础语法** ：描述目标和依赖的特定格式，Makefile 的核心。
 2. **变量**：记录特定的信息，避免重复输入原始信息，尤其是当需要手动输入的信息很长时。
 3. **分支判断**：灵活控制多个不同的编译过程，方便兼容不同属性。
 4. **头文件依赖**：监控头文件的变化，头文件也是程序的关键内容。
