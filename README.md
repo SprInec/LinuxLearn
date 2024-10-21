@@ -295,7 +295,7 @@ sudo ufw allow ssh
 
 然后即可通过命令 `ssh username@server_ip` 从客户端连接到板卡/虚拟机/服务器了，也可通过 Tabby、MobaXterm、PuTTY、electerm、FinalShell、Hyper、SecureCRT、Termius 或是安装了 Remote SSH 插件的 VScode 进行 SSH 远程连接。
 
-比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。其中若想给 VSCode 配置 SSH 免密远程登陆可查看 **OTHER - [VSCode 配置 SSH 免密远程登陆](###VSCode 配置 SSH 免密远程登陆)** 。
+比较推荐 [Tabby](https://github.com/Eugeny/tabby)、[Termius](https://termius.com/) 和安装了 Remote SSH 插件的 VScode。其中若想给 VSCode 配置 SSH 免密远程登陆可查看 **OTHER - [VSCode 配置 SSH 免密远程登陆](#VSCode 配置 SSH 免密远程登陆)** 。
 
 - Tabby
 
@@ -347,10 +347,11 @@ sudo ufw allow ssh
     - `-R/r` ：递归处理
 
 - `rm [-option] [一个或多个文件/文件夹名]` ：删除一个或多个文件或目录
+    
     - `-R/r` ：递归处理
     - `-i` ：删除文件或文件夹前，终端会逐一询问确认
-    - `-f` ：忽略不存在的文件，无需逐一确认
-
+    - `-f` ：强制删除文件或目录
+    
 - `which [xxx]` ：查找并显示给定命令的绝对路径
 
 - `echo` ：输出指定的字符串或者变量
@@ -615,7 +616,7 @@ vim 文件名
 
     ![image-20241017010225406](.assets/image-20241017010225406.png)
 
-    具体处理方式请看 **ERROR LOG - [Vim Ctrl+z 强制退出后再次进入显示 E325：注意](###Vim Ctrl+z 强制退出后再次进入显示 E325：注意)**
+    具体处理方式请看 **ERROR LOG - [Vim Ctrl+z 强制退出后再次进入显示 E325：注意](#Vim Ctrl+z 强制退出后再次进入显示 E325：注意)**
 
 2. 在**命令行模式**下输入退出命令退出
 
@@ -1802,7 +1803,7 @@ sudo apt install make
 ##### 10.3.1 Makefile 小实验
 
 ```makefile
-# path: /makefile/test1/Makefile
+# path: base_linux/makefile/test1/Makefile
 targeta: targetc targetb
         ls -lh
 
@@ -1847,7 +1848,7 @@ make 程序会根据 Makefile 中描述的目标与依赖关系，执行达成�
 使用 vim 在指定路径下创建并编写以下文件：
 
 ```c
-// path: /makefile/test2/hello_main.c
+// path: base_linux/makefile/test2/hello_main.c
 #include "hello_func.h"
 
 int main(void)
@@ -1858,7 +1859,7 @@ int main(void)
 ```
 
 ```c
-// path: /makefile/test2/hello_func.c
+// path: base_linux/makefile/test2/hello_func.c
 #include <stdio.h>
 #include "hello_func.h"
 
@@ -1873,7 +1874,7 @@ void hello_func(void)
 ```
 
 ```c
-// path: /makefile/test2/hello_func.h
+// path: base_linux/makefile/test2/hello_func.h
 void hello_func(void);
 ```
 
@@ -1898,7 +1899,7 @@ gcc hello_main.c hello_func.c -o hello_main -I .
 使用 vim 创建 Makefile 文件并编写如下代码:
 
 ```makefile
-# path: /makefile/test2/Makefile
+# path: base_linux/makefile/test2/Makefile
 hello_main: hello_main.c hello_func.c
 	gcc -o hello_main hello_main.c hello_func.c -I .
 
@@ -1958,10 +1959,10 @@ Makefile 使用 **`.PHONY`** 前缀来区分目标代号和目标文件，并且
 
 也就是说，只要我们不期待生成目标文件，就应该把对应的目标定义成伪目标。
 
-前面 [10.3.1](#####10.3.1 Makefile 小实验) 的演示代码修改如下：
+前面 [10.3.1](#10.3.1 Makefile 小实验) 的演示代码修改如下：
 
 ```makefile
- # path: /makefile/test1/Makefile
+ # path: base_linux/makefile/test1/Makefile
 .PHONY: targeta
 targeta: targetc targetb
 	ls -lh
@@ -1986,10 +1987,10 @@ cd test3
 touch clean
 ```
 
-[10.3.2.2](######10.3.2.2 使用 Makefile 编译) 的演示代码修改如下:
+[10.3.2.2](#10.3.2.2 使用 Makefile 编译) 的演示代码修改如下:
 
 ```makefile
-# path: /makefile/test3/Makefile
+# path: base_linux/makefile/test3/Makefile
 hello_main: hello_main.c hello_func.c
 	gcc -o hello_main hello_main.c hello_func.c -I .
 
@@ -2002,27 +2003,400 @@ clean:
 
 #### 10.6 默认规则
 
+GCC 的整个编译过程包含如下步骤，make 在执行时也是使用同样的流程，不过在 Makefile 的实际应用中，通常会把编译和最终的链接过程分开。
+
+```mermaid
+graph LR;
+	A[hello.c] --> |编译|B[hello.o] --> |链接|C[hello]
+	B --> |make 默认依赖|A
+	C --> |依赖|B
+```
 
 
 
+即我们的 `hello_main` 目标文件本质上并不是依赖 `hello_main.c` 和 `hello_func.c` 文件，而是依赖于 `hello_main.o` 和 `hello_func.o`，把这两个文件链接起来就能得到我们最终想要的 `hello_main`  目标文件。
 
+make 有一条默认规则，当找不到 `xxx. o` 文件时，会查找目录下的同名  `xxx.c` 文件进行编译。根据这样的规则，我们可把 Makefile 改修改如下。
 
+```makefile
+# path: base_linux/makefile/test4/Makefile
+hello_main: hello_main.o hello_func.o
+	gcc -o hello_main hello_main.o hello_func.o
 
+# 以下是 make 的默认规则，可以不写
+#hello_main.o: hello_main.c
+#	gcc -c hello_main.c
+	
+#hello_func.o: hello_func.c
+#	gcc -c hello_func.c
+```
 
+最终使用 make 的编译结果如下：
 
+![image-20241021150654908](.assets/image-20241021150654908.png)
 
+从 make 的输出可看到，它先执行了两条额外的 `cc` 编译命令，这是由 make 默认规则执行的，  它们把 C 代码编译生成了同名的 `.o` 文件，然后 make 根据 Makefile 的命令链接这两个文件得到最终目标文件 `hello_main`。
 
+#### 10.7 使用变量
 
+使用 C 自动编译成 `*.o` 的默认规则有个缺陷，由于没有显式地表示 `*.o` 依赖于`.h` 头文件，假如我们修改了头文件的内容，那么 `*.o` 并不会更新，这是不可接受的。并且默认规则使用固定的 `cc`  进行编译，假如我们想使用 ARM-GCC 进行交叉编译，那么系统默认的 `cc` 会导致编译错误。  要解决这些问题并且让 Makefile 变得更加通用，需要引入变量和分支进行处理。
 
+##### 10.7.1 基本语法
 
+在 Makefile 中的变量，有点像 C 语言的宏定义，在引用变量的地方使用变量值进行替换。变量的命名可以包含字符、数字、下划线,区分大小写，定义变量的方式有以下四种：
 
+- `=` ：延时赋值，该变量只有在调用的时候，才会被赋值。
+- `:=` ：直接赋值，与延时赋值相反，使用直接赋值的话，变量的值定义时就已经确定了。
+- `?=` ：若变量的值为空，则进行赋值，通常用于设置默认值。
+- `+=` ：追加赋值，可以往变量后面增加新的内容。
 
+当我们想使用变量时，其语法如下：
 
+```makefile
+$(变量名)
+```
 
+实验代码：
 
+```makefile
+# path: base_linux/makefile/test5/Makefile
+VAR_A = FILEA
+VAR_B = $(VAR_A)
+VAR_C := $(VAR_A)
+VAR_A += FILEB
+VAR_D ?= FILED
 
+.PHONY: check
+check:
+	@echo "VAR_A:" $(VAR_A)
+	@echo "VAR_B:" $(VAR_B)
+	@echo "VAR_C:" $(VAR_C)
+	@echo "VAR_D:" $(VAR_D)
+```
 
+![image-20241021160221351](.assets/image-20241021160221351.png)
 
+执行完 make 命令后，只  有 VAR_C 是 `FILEA`。这是因为 VAR_B 采用的延时赋值，只有当调用时，才会进行赋值。当调  用 VAR_B 时，VAR_A 的值已经被修改为 `FILEA FILEB`，因此 VAR_B 的变量值也就等于 `FILEA  FILEB`。
+
+##### 10.7.2 改造默认规则
+
+下面使用变量对 [hello_main](#10.3.2.2 使用 Makefile 编译) 的 Makefile 进行大改造：
+
+```makefile
+# path: base_linux/makefile/test6/Makefile
+# 定义变量
+CC = gcc
+CFLAGS = -I .
+DEPS = hello_func.h
+
+# 目标文件
+hello_main: hello_main.o hello_func.o
+	$(CC) -o hello_main hello_main.o hello_func.o
+	
+# *.o 文件的生成规则
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+# 伪目标
+.PHONY: clean
+clean:
+	rm -f *.o hello_main
+```
+
+- 代码的 3~5 行：分别定义了 CC、CFLAGS、DEPS 变量，变量的值就是等号右侧的内容，定  义好的变量可通过 `$(变量名)` 的形式引用，如后面的 `$(CC)`、`$( CFLAGS)`、`$(DEPS)`  等价于定义时赋予的变量值 `gcc`、`-I.` 和 `hello_func.h`。
+
+- 代码的第 9 行：使用 `$(CC)` 替代了 `gcc`，这样编写的 Makefile 非常容易更换不同的编译器，如要进行交叉编译，只要把开头的编译器名字修改掉即可。
+
+- 代码的第 12 行：`%` 是一个通配符，功能类似 `*`，如 `%.o` 表示所有以 `.o` 结尾的文件。
+
+    即等价于 o 文件依赖于 c 文件的默认规则。不过这行代码后面的 `$(DEPS)` 表示它除了依赖 c 文件，还依赖于变量 `$(DEPS)` 表示的头文件，所以当头文件修改的话 `.o` 文件也会被重新编译。
+
+- 代码的第 13 行：这行代码出现了特殊的变量 `$@` 、`$<` ，可理解为 Makefile 文件保留的关键字，是系统保留的自动化变量:
+
+    - `$@` 代表了目标文件
+    - `$<` 代表了第一个依赖文件
+
+    即 `$@` 表示 `%.o`，`$<` 表示 `%.c` ，所以当第 11 行的 `%` 匹配的字符为 `hello_func` 的话，第 13 行代码等价于：
+
+    ```makefile
+    $(CC) -c -o $@ $< $(CFLAGS)
+    # 等价于
+    gcc -c -o hello_func.o hello_func.c -I .
+    ```
+
+    也就是说 makefile 可以利用变量及自动化变量，来重写 `.o` 文件的默认生成规则，以及增加头文件的依赖。
+
+![image-20241021173237478](.assets/image-20241021173237478.png)
+
+##### 10.7.3 改造链接规则
+
+与 *.o 文件的默认规则类似，我们也可以使用变量来修改生成最终目标文件的链接规则，具体参  考如下代码。
+
+```makefile
+# path: base_linux/makefile/test7/Makefile
+# 定义变量
+TARGET = hello_main
+CC = gcc
+CFLAGS = -I .
+DEPS = hello_func.h
+OBJS = hello_main.o hello_func.o
+
+# 目标文件
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+
+# *.o 文件的生成规则
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+	
+# 伪目标
+.PHONY: clean
+clean:
+	rm -f *.o hello_main
+```
+
+- 代码的第 3 行：定义了 `TARGET` 变量，它的值为目标文件名 `hello_main`。
+- 代码的第 7 行：定义了 `OBJS` 变量，它的值为依赖的各个 o 文件，如 `hello_main.o`、`hello_func.o`  文件。
+- 代码的第 10 行：使用 `TARGET` 和 `OBJS` 变量替换原来固定的内容。
+- 代码的第 11 行：使用自动化变量 `$@` 表示目标文件 `$(TARGET)` ，使用自动化变量 `$^`  表示所有的依赖文件即 `$(OBJS)`。
+
+以上代码中的 Makefile 把编译及链接的过程都通过变量表示出来了，非常通用。使用这样的 Makefile 可以针对不同的工程直接修改变量的内容就可以使用。
+
+##### 10.7.4 其他自动化变量
+
+| 符号 | 意义                                               |
+| :--: | -------------------------------------------------- |
+|  $@  | 匹配目标文件                                       |
+|  $%  | 与 `$@` 类似，但 `$%` 仅匹配 “ 库 ” 类型的目标文件 |
+|  $<  | 依赖中的第一个目标文件                             |
+|  $^  | 所有的依赖目标，如果依赖中有重复的，只保留一份     |
+|  $+  | 所有依赖的目标，即使依赖中有重复的也原样保留       |
+|  $?  | 所有比目标要新的依赖目标                           |
+
+#### 10.8 使用函数
+
+在更复杂的工程中，头文件、源文件可能会放在二级目录，编译生成的 `*.o` 或可执行文件也放到  专门的编译输出目录方便整理，如下图所示。示例中 `*.h` 头文件放在 `includes` 目录下，`*.c` 文件放在 `sources` 目录下，编译输出存放在 `build` 中。
+
+实现这些复杂的操作通常需要使用 Makefile 函数。
+
+![image-20241021175854256](.assets/image-20241021175854256.png)
+
+##### 10.8.1 函数格式及示例
+
+在 Makefile 中调用函数的方法跟变量的使用类似，以 `$()` 或 `${}` 符号包含函数名和参数，具  体语法如下：
+
+```makefile
+$(函数名 参数)
+# or
+${函数名 参数}
+```
+
+###### 10.8.1.1 notdir 函数
+
+**`notdir`** 函数用于去除文件路径中的目录部分，其格式如下：
+
+```makefile
+$(notdir 文件名)
+```
+
+例如输入参数 `./sources/hello_func.c`，函数执行后的输出为 `hell_func.c`，也就是说它会把输入中的 `./sources/` 路径部分去掉，保留文件名。使用范例如下:
+
+```makefile
+$(notdir ./source/hello_func.c)
+```
+
+上面的函数执行后会把路径中的 `./sources/` 部分去掉，输出为 `hello_func.c`
+
+###### 10.8.1.2 wildcard 函数
+
+**`wildcard`** 函数用于获取文件列表，并使用空格分隔开，其格式如下：
+
+```makefile
+$(wildcard 匹配规则)
+```
+
+例如函数调用 `$(wildcard *.c)` ，函数执行后会把当前目录的所有 c 文件列出。假设我们在  上图中的 Makefile 目录下执行该函数，使用范例如下:
+
+```makefile
+# 在 sources 目录下有 hello_func.c、hello_main.c、test.c 文件
+$(wilecard sources/*.c)
+# 函数的输出为：
+sources/hello_func.c sources/hello_main.c sources/test.c
+```
+
+###### 10.8.1.3 patsubst 函数
+
+**`patsubst`** 函数功能为模式字符串替换。它的格式如下:
+
+```makefile
+$(patsubst 匹配规则，替换规则，输入的字符串) 
+```
+
+当输入的字符串符合匹配规则，那么使用替换规则来替换字符串，当匹配规则中有 `%` 号时，替换规则也可以例程 `%` 号来提取 `%` 匹配的内容加入到最后替换的字符串中。示例如下：
+
+```makefile
+$(patsubst %.c, build_dir/%.o, hello_main.c)
+# 函数的输出为:
+build_dir/hello_main.o
+# 执行如下函数
+$(patsubst %.c, build_dir/%.o, hello_main.xxx)
+# 由于 hello_main.xxx 不符合匹配规则 "%.c",所以函数没有输出
+```
+
+第一个函数调用中，由于 `hello_main.c` 符合 `%.c` 的匹配规则 ( `%` 在 Makefile 中的类似于 `*` 通配符 )，而且 `%` 从 `hello_main.c` 中提取出了 `hello_main` 字符，把这部分内容放到替换规  则 `build_dir/%.o` 的 `%` 号中，所以最终的输出为 `build_di r/hello_main.o`。 
+
+ 第二个函数调用中，由于由于 `hello_main.xxx` 不符合 `%.c` 的匹配规则，`.xxx` 与 `.c` 对  不上，所以不会进行替换，函数直接返回空的内容。
+
+##### 10.8.2 多级结构工程的 Makefile
+
+接下来我们使用上面三个函数修改我们的 Makefile，以适应包含多级目录的工程，修改后的内容如下所示：
+
+```makefile
+# path: base_linux/makefile/test8/Makefile
+# Defining variables
+TARGET = hello_main
+
+# Path to store intermediate files
+BUILD_DIR = build
+
+# Path to store the source files
+SRC_DIR = sources
+
+# Path to store the include files
+INC_DIR = includes .
+
+# Source files
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+# Object files (*.o)
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+# Header files
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+# Specify the path to the header files
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+# Target file
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+
+# Generation rules for *.o files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+
+# Create a compilation directory to store process files
+# The command is preceded by '@', which means it will not be 
+# output on the terminnal.
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+# Phony target
+.PHONY: clean cleanall
+
+# Delete the output folder
+clean: 
+	rm -rf $(BUILD_DIR)
+	
+# Delete all
+cleanall: 
+	rm -rf $(BUILD_DIR)
+```
+
+目录结构如下：
+
+```bash
+.
+├── includes
+│   └── hello_func.h
+├── Makefile
+└── sources
+    ├── hello_func.c
+    └── hello_main.c
+```
+
+![image-20241021192728178](.assets/image-20241021192728178.png)
+
+#### 10.9 使用分支
+
+为方便直接切换 GCC 编译器，我们还可以使用条件分支增加切换编译器的功能。在 Makefile 中  的条件分支语法如下：
+
+```makefile
+ifeq (arg1, arg2)
+分支 1
+else
+分支 2
+endif
+```
+
+分支会比较括号内的参数 `arg1` 和 `arg2` 的值是否相同，如果相同，则为真，执行分支 1 的内容，否则的话，执行分支 2 的内容，参数 `arg1` 和 `arg2` 可以是变量或者是常量。
+
+使用分支切换 GCC 编译器的 Makefile 如下所示：
+
+```makefile
+# path: base_linux/makefile/test9/Makefile
+# Defining variables
+# ARCH default to x86, using the gcc compiler
+# Otherwise use the arm compiler
+ARCH ?= arm
+TARGET = hello_main
+
+# Path to store intermediates files
+BUILD_DIR = build_$(ARCH)
+
+# Path to store the source files
+SRC_DIR = sources
+
+# Path to store the includes files
+INC_DIR = includes .
+
+# The source files
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+# The objects files
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+# The header files
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+# Specity the path to the header files
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+# Select compiler based on input ARCH variable
+# ARCH = arm, use gcc
+# ARCH = aarch64, use arm-gcc
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+# Target file
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+
+# Generation rules for the *.o files
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+	
+# Phony targets
+.PHONY: clean cleanall
+
+# Delete by Schema
+clean:
+	rm -rf $(BUILD_DIR)
+	
+# Delete all
+cleanall:
+	rm -rf build_aarch64 build_arm
+```
+
+- arm 交叉编译工具链 `aarch64-linux-gnu-gcc` 的获取与配置见：**[五. Linux驱动开发 - 2.1 获取编译工具链](#2.1 获取编译工具链)**
+- 本示例中的 Makefile 目前只支持使用一个源文件目录，如果有多个源文件目录还需要改进。
+
+![image-20241021200852732](.assets/image-20241021200852732.png)
+
+### 11. 文件操作与系统调用
 
 
 
