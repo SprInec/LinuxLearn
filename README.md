@@ -385,10 +385,12 @@ sudo ufw allow ssh
 
 - `sudo` ：管理员权限
     - `sudo !!` ：使用 sudo 权限重新执行上一条指令
+    - `sudo -i` ：切换到 root 账户
 - `sudo apt update` ：更新软件
 - `sudo apt upgrade` ：安装更新的软件
 - `sudo apt install xxx` ：软件安装
 - `sudo apt remove xxx` ：软件卸载
+- `su` ：切换到 root 账户
 
 #### 2.2 其他软件
 
@@ -3272,9 +3274,215 @@ clean:
 ```bash
 make
 ./hello_sys
+tree
 ```
 
 ![image-20241022162826037](.assets/image-20241022162826037.png)
+
+结果与 `printf` 一样。
+
+### 13. GPIO 子系统
+
+本节的代码目录为：`base_linux/gpio/`
+
+LubanCat 4 RK3588S 的 40Pin 引脚对照表如下所示：
+
+![image-20241022165156188](.assets/image-20241022165156188.png)
+
+#### 13.1 GPIO 简介
+
+GPIO 是 General Purpose I/O 的缩写，即通用输入输出端口，简单来说就是 MCU/CPU 可控制的引脚，这些引脚通常有多种功能，最基本的是高低电平输入检测和输出，部分引脚还会与主控器的片上外设绑定，如作为串口、I2C、网络、电压检测的通讯引脚。
+
+Linux 提供了GPIO 子系统驱动框架，使用该驱动框架可以把 CPU 的 GPIO 引脚导出到用户空间，用户通过访问 `/sys` 文件系统进行控制，GPIO 子系统支持把引脚用于基本的输入输出功能，其中输入功能还支持中断检测。在 Linux 内核源码的 `Documentation/gpio` 目录可找到关于 GPIO 子系统的说明。
+
+##### 13.1.1 GPIO 设备目录
+
+GPIO 驱动子系统导出到用户空间的目录是 `/sys/class/gpio` 。
+
+可使用以下命令查看：
+
+切换到 root 用户：
+
+```bash
+sudo -i
+```
+
+导出 GPIO 到用户空间：
+
+```bash
+echo 42 > /sys/class/gpio/export
+```
+
+查看目录变化，增加了 `gpio42` 目录：
+
+```bash
+ls /sys/class/gpio/
+```
+
+把 `gpio42` 从用户空间取消导出：
+
+```bash
+echo 42 > /sys/class/gpio/unexport
+```
+
+查看目录变化， `gpio42` 目录消失了：
+
+```bash
+ls /sys/class/gpio/
+```
+
+![image-20241022173434172](.assets/image-20241022173434172.png)
+
+- `export` ：导出GPIO，该文件只能写不能读，用户向该文件写入GPIO 的编号 N 可以向
+    内核申请将该编号的 GPIO 导出到用户空间，若内核本身没有把该 GPIO 用于其它功能，那
+    么在 `/sys/class/gpio` 目录下会新增一个对应编号的 `gpioN` 目录，如上图一导出了`gpio42`。
+- `unexport` ：`export` 的相反操作，取消导出GPIO，该文件同样只能写不能读。上图演示
+    了往 `unexport` 写入42 后，`gpio42` 目录消失了。
+
+- `gpiochipX` ：该目录是指 GPIO 控制器外设。
+- `gpioN` ：通过 `export` 导出的具体 GPIO 引脚的控制目录，如上图中的 `gpio42` 目录下会包含有控制该引脚的相应文件。
+
+##### 13.1.2 GPIO 设备属性
+
+`gpioN` 目录下相关的设备文件，可以使用以下命令查看：
+
+```bash
+echo 42 > /sys/class/gpio/export
+cd /sys/class/gpio/gpio42
+
+ls -lh
+```
+
+![image-20241022182948525](.assets/image-20241022182948525.png)
+
+- **`direction`** ：表示GPIO 引脚的方向，它的可取值如下：
+    1. `in` ：引脚为输入模式
+    2. `out` ：引脚为输出模式，且默认输出电平为低
+    3. `low` ：引脚为输出模式，且默认输出电平为低
+    4. `high` ：引脚为输出模式，且默认输出电平为高
+
+- **`value`** ：表示 GPIO 的电平，1 表示高电平，0 表示低电平。GPIO 被配置为输出模式，那么修改该文件的内容可以改变引脚的电平。
+- **`edge`** ：用于配置 GPIO 的中断触发方式，当 GPIO 被配置为中断时，可以通过系统的 `poll` 函数监听。`edge` 文件可取如下的属性值：
+    1. `none` ：没有使用中断模式
+    2. `rising` ：表示引脚为中断输入模式，上升沿触发
+    3. `falling` ：表示引脚为中断输入模式，下降沿触发
+    4. `both` ：表示引脚为中断输入模式，边沿触发
+
+如果该引脚会被设备占用，它的功能在用户空间是无法再被修改的，而使用 GPIO 子系统的设备则可以在用户空间灵活配置作为输入、输出或中断模式。
+
+#### 13.2 引脚编号转换
+
+Rockchip Pin 的 ID 按照控制器 ( bank ) + 端口 ( port ) + 索引序号 ( pin ) 组成。
+
+- 控制器和GPIO 控制器数量一致
+- 端口固定 A、B、C 和 D，每个端口仅有 8 个索引号，( A = 0, B = 1, C = 2, D = 3 )
+- 索引序号固定 0、1、2、3、4、5、6、7
+
+作为GPIO 功能时，端口行为由 GPIO 控制器寄存器配置。如 `gpio0_xx`，`gpio1_xx`，`gpio2_xx`，`gpio3_xx`，`gpio4_xx` 。
+
+`GPIO1_A4` 表达的意思为第 1 组控制器，端口号为A，索引号为4。该引脚号的计算公式为 
+$$
+32 * 1 + 0 * 8 + 4 = 36
+$$
+
+> :warning: **NOTICE**
+>
+> 并不是所有的引脚都能通过 `export` 文件导出到用户空间的，在使用的引脚是不能被导出的
+>
+> ![image-20241022185258739](.assets/image-20241022185258739.png)
+
+#### 13.3 GPIO sysfs 接口控制 gpio
+
+##### 13.3.1 命令行
+
+在板卡上执行以下命令，执行时需确保当前用户为 root 用户：
+
+```bash
+# Enable pin
+echo 42 > /sys/class/gpio/export
+
+# Set the pin to input mode
+echo in > /sys/class/gpio/gpio42/direction
+# Read the value of the pin
+cat /sys/class/gpio/gpio42/value
+
+#　Set the pin to output mode
+echo out > /sys/class/gpio/gpio42/direction
+# Set the pin to low level
+echo 0 > /sys/class/gpio/gpio42/value
+# Set the pin to high level
+echo 1 > /sys/class/gpio/gpio42/value
+
+# Reset the pin
+echo 42 > /sys/class/gpio/unexport
+```
+
+![image-20241022185552391](.assets/image-20241022185552391.png)
+
+- 把 GPIO 的编号写入到 `export` 文件，导出 GPIO 设备。
+
+- 修改 GPIO 设备属性 `direction` 文件值为 `out`，把 GPIO 设置为输出方向。
+
+- 修改 GPIO 设备属性文件 `value` 的值为 1 或 0，控制 GPIO 高电平或低电平。
+
+##### 13.3.2 程序编写
+
+退出 root 账户：
+
+```bash
+exit
+```
+
+编写以下代码：
+
+```c
+// path: base_linux/gpio/gpio_sys/gpio_sys.c
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
