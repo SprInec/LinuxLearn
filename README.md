@@ -347,7 +347,7 @@ sudo ufw allow ssh
     - `-R/r` ：递归处理
 
 - `rm [-option] [一个或多个文件/文件夹名]` ：删除一个或多个文件或目录
-    
+  
     - `-R/r` ：递归处理
     - `-i` ：删除文件或文件夹前，终端会逐一询问确认
     - `-f` ：强制删除文件或目录
@@ -373,6 +373,8 @@ sudo ufw allow ssh
 - `chmod` ：用来变更文件或目录的权限
 
 
+
+- `ps` ：报告当前系统的进程状态
 
 - `df` ：显示磁盘的相关信息
     - `-h` ：以可读性较高的方式来显示信息
@@ -2398,19 +2400,881 @@ cleanall:
 
 ### 11. 文件操作与系统调用
 
+在 Linux 系统中有一个重要的概念：一切皆文件，它把一切资源都看作是文件，包括硬件设备，  通常称为设备文件。
 
+本节的代码目录为 `./base_linux/file_io`
 
+#### 11.1 存储设备文件系统
 
+为了高效地存储和管理数据，文件系统在存储介质上建立了一种组织结构，这些结构包括操作系  统引导区、目录和文件，就如同图书馆给不同类的书籍进行分类、编号，放在不同的书架上。不  同的管理理念引出了不同的文件系统标准，上述的 FAT32、NTFS、exFAT、ext2/3/4 就是指不同类型的标准，除此之外，还有专门针对 NAND 类型设备的文件系统 jffs2、yaffs2 等等。
 
+各种不同标准文件系统的特性：
 
+- **FAT32 格式**：兼容性好，STM32 等 MCU 也可以通过 Fatfs 支持 FAT32 文件系统，大部分  SD 卡或 U 盘出厂默认使用的就是 FAT32 文件系统。它的主要缺点是技术老旧，单个文件  不能超过 4GB，非日志型文件系统。
+- **NTFS 格式**：单个文件最大支持 256TB、支持长文件名、服务器文件管理权限等，而且 NTFS  是日志型文件系统。但由于是日志型文件系统，会记录详细的读写操作，相对来说会加快 FLASH 存储器的损耗。文件系统的日志功能是指，它会把文件系统的操作记录在磁盘的某个分区，当系统发生故障时，能够尽最大的努力保证数据的完整性。
+- **exFAT 格式**：基于 FAT32 改进而来，专为 FLASH 介质的存储器设计 ( 如 SD 卡、U 盘)，空  间浪费少。单个文件最大支持16EB，非日志文件系统。
+- **ext2 格式**：简单,文件少时性能较好，单个文件不能超过 2TB，非日志文件系统。
+- **ext3 格式**：相对于 ext2 主要增加了支持日志功能。
+- **ext4 格式**：从 ext3 改进而来，ext3 实际是 ext4 的子集。它支持 1EB 的分区，单个文件最大支持 16TB，支持无限的子目录数量，使用延迟分配策略优化了文件的数据块分配，允许自主控制是否使用日志的功能。
+- **jffs2 和 yaffs2 格式**：jffs2 和 yaffs2 是专为 FLASH 类型存储器设计的文件系统，它们针对  FLASH 存储器的特性加入了擦写平衡和掉电保护等特性。由于 Nor、NAND FLASH 类型存  储器的存储块的擦写次数是有限的 ( 通常为 10 万次 ) ，使用这些类型的文件系统可以减少  对存储器的损耗。
 
+总的来说，在 Linux 下，ext2 适用于 U 盘 ( 但为了兼容，使用得比较多的还是 FAT32 或 exFAT），  日常应用推荐使用 ext4，而 ext3 使用的场景大概就只剩下对 ext4 格式的稳定性还有疑虑的用户了，但 ext4 从 2008 年就已结束实验期，进入稳定版了，可以放心使用。
 
+Linux 内核本身也支持 FAT32 文件系统，而使用 NTFS 格式则需要安装额外的工具如 ntfs-3g。所以使用板卡出厂的默认 Linux 系统时，把 FAT32 格式的 U 盘直接插入到板卡是可以自动挂载的，而 NTFS 格式的则不支持。
 
+主机上的 Ubuntu 对于 NTFS 或 FAT32 的 U 盘都能自动识别并挂载,  因为 U buntu 发行版安装了相应的支持。目前微软已公开 exFAT 文件系统的标准，且已把它开源至 Linux，未来 Linux 可能也默认支持 exFAT。
 
+对于非常在意 FLASH 存储器损耗的场合，则可以考虑使用 jffs2 或 yaffs2 等文件系统。
 
+在 Linux 下，可以通过如下命令查看系统当前存储设备使用的文件系统：
 
+```bash
+df -T
+```
 
+![image-20241021211511448](.assets/image-20241021211511448.png)
 
+#### 11.2 伪文件系统
+
+除了前面介绍的专门用于存储设备记录文件的文件系统外，Linux 内核还提供了 procfs、sysfs 和  devfs 等伪文件系统。
+
+伪文件系统存在于内存中，通常不占用硬盘空间，它以文件的形式，向用户提供了访问系统内核  数据的接口。用户和应用程序可以通过访问这些数据接口，得到系统的信息，而且内核允许用户  修改内核的某些参数。
+
+##### 11.2.1 procfs 文件系统
+
+procfs 是 process filesystem 的缩写，所以它也被称为进程文件系统，procfs 通常会自动挂载在根目录下的/proc 文件夹。procfs 为用户提供内核状态和进程信息的接口，功能相当于 Windows 的任务管理器。
+
+使用如下命令可以查看 proc 文件系统的内容：
+
+- 查看 CPU 信息
+
+    ```bash
+    cat /proc/cpuinfo
+    ```
+
+    ![image-20241022091451364](.assets/image-20241022091451364.png)
+
+- 查看 proc 目录
+
+    ```bash
+    ls /proc
+    ```
+
+    ![image-20241022091530739](.assets/image-20241022091530739.png)
+
+`ls /proc`  包含了非常多以数字命名的目录，这些数字就是进程的 PID 号，其它文件或目录的一些说明见下表：
+
+`/proc` 各个文件的作用：
+
+|   文件名    | 作用                                                         |
+| :---------: | ------------------------------------------------------------ |
+|    pid*     | * 表示的是进程的 PID 号，系统中当前运行的每一个进程都有对应的一个目录，用于记录进程所有相关信息。对于操作系统来说，一个应用程序就是一个进程。 |
+|    self     | 该文件是一个软链接，指向了当前进程的目录，通过访问 `/proc/self/` 目录来获取当前进程的信息，就不用每次都获取 pid。 |
+| threadself  | 该文件也是一个软链接，指向了当前线程，访问该文件，等价于访问 “ 当前进程 `pid/task/` 当前线程 `tid` ” 的内容。一个进程，可以包含多个线程，但至少需要一个进程，这些线程共同支撑进程的运行。 |
+|   version   | 记录了当前运行的内核版本，通常可以使用命令 `uname –r` 。     |
+|   cpuinfo   | 记录系统中 CPU 的提供商和相关配置信息。                      |
+|   modules   | 记录了目前系统加载的模块信息。                               |
+|   meminfo   | 记录系统中内存的使用情况，`free` 命令会访问该文件，来获取系统内存的空闲和已使用的数量。 |
+| filesystems | 记录内核支持的文件系统类型，通常 `mount` 一个设备时，如果没有指定文件系统并且它无法确定文件系统类型时，mount 会尝试包含在该文件中的文件系统，除了那些标有 `nodev` 的文件系统。 |
+
+使用如下命令来查看当前 `bash` 进程的 PID 号：
+
+```bash
+ps
+```
+
+每个人的计算机运行运行状况不一样，所以得到的进程号也是不一样，如下图所示，当前得到  `bash` 进程的 pid 是 `38006` :
+
+![image-20241022092604752](.assets/image-20241022092604752.png)
+
+根据这个 pid 号，查看 `proc/38006` 目录的内容，它记录了进程运行过程的相关信息：
+
+```bash
+ls /proc/38006
+```
+
+![image-20241022092913124](.assets/image-20241022092913124.png)
+
+该目录下的一些文件夹和文件的意义如下表：
+
+|  文件名   | 文件内容                                                     |
+| :-------: | ------------------------------------------------------------ |
+|  cmdline  | 只读文件，记录了该进程的命令行信息，如命令以及命令参数       |
+|   comm    | 记录了进程的名字                                             |
+|  environ  | 进程使用的环境变量                                           |
+|    exe    | 软连接文件，记录命令存放的绝对路径                           |
+|    fd     | 记录进程打开文件的情况，以文件描述符作为目录名               |
+|  fdinfo   | 记录进程打开文件的相关信息，包含访问权限以及挂载点，由其文件描述符命名 |
+|    io     | 记录进程读取和写入情况                                       |
+| map_files | 记录了内存中文件的映射情况，以对应内存区域起始和结束地址命名 |
+|   maps    | 记录当前映射的内存区域，其访问权限以及文件路径               |
+|   stack   | 记录当前进程的内核调用栈信息                                 |
+|  status   | 记录进程的状态信息                                           |
+|  syscall  | 显示当前进程正在执行的系统调用，第一列记录了系统调用号       |
+|   task    | 记录了该进程的线程信息                                       |
+|   wcham   | 记录当前进程处于睡眠状态，内核调用的相关函数                 |
+
+如果是文件，可以直接使用 `cat` 命令输出对应文件的内容可查看，如查看进程名：
+
+```bash
+cat /proc/38006/comm
+```
+
+![image-20241022093312239](.assets/image-20241022093312239.png)
+
+前面的 `ps` 命令也是通过 proc 文件系统获取到相关进程信息的。
+
+##### 11.2.2 sysfs 文件系统
+
+Linux 内核在 2.6 版本中引入了 sysfs 文件系统，sysfs 通常会自动挂载在根目录下的 `sys` 文件夹。
+
+sys 目录下的文件/文件夹向用户提供了一些关于设备、内核模块、文件系统以及其他内核组件的  信息，如子目录 `block` 中存放了所有的块设备，而 `bus` 中存放了系统中所有的总线类型，有 `i2c`、  `usb`、`sdi o`、`pci` 等。
+
+下图中的虚线表示软连接，可以看到所有跟设备有关的文件或文件夹都链接 到了 `device` 目录下，类似于将一个大类，根据某个特征分为了无数个种类，这样使得 `/sys` 文件夹的结构层次清晰明了：
+
+![image-20241022093840256](.assets/image-20241022093840256.png)
+
+`/sys` 各个文件的作用：
+
+| 文件名  | 作用                                                         |
+| :-----: | ------------------------------------------------------------ |
+|  block  | 记录所有在系统中注册的块设备，这些文件都是符号链接，都指向了`/sys/devices` 目录。 |
+|   bus   | 该目录包含了系统中所有的总线类型，每个文件夹都是以每个总线的类型来进行命名。 |
+|  class  | 包含了所有在系统中注册的设备类型，如块设备、声卡、网卡等。文件夹下的文件同样也是一些链接文件，指向了 `/sys/devices` 目录。 |
+| devices | 包含了系统中所有的设备，到跟设备有关的文件/文件夹，最终都会指向该文件夹。 |
+| module  | 该目录记录了系统加载的所有内核模块，每个文件夹名以模块命名。 |
+|   fs    | 包含了系统中注册文件系统。                                   |
+
+概括来说，sysfs 文件系统是内核加载驱动时，根据系统上的设备和总线构成导出的分级目录，它是系统上设备的直观反应，每个设备在 sysfs 下都有唯一的对应目录，用户可以通过具体设备目  录下的文件访问设备。
+
+##### 11.2.3 devfs 文件系统
+
+在 Linux 2.6 内核之前一直使用的是 devfs 文件系统管理设备，它通常挂载于 `/dev` 目录下。
+
+devfs 中的每个文件都对应一个设备，用户也可以通过 `/dev` 目录下的文件访问硬件。在 sysfs 出现之前，devfs 是在制作根文件系统的时候就已经固定的，这不太方便使用，而当代的 devfs 通常会在系统运行时使用名为 `udev` 的工具根据 sysfs 目录生成 devfs 目录。在后面学习制作根文件系统时，就会接触到静态 devfs 以及使用 `udev` 动态生成 devfs 的选项。
+
+#### 11.3 虚拟文件系统
+
+除了前面提到的存储器文件系统 FAT32、ext4,伪文件系统/proc、/sys、/dev 外，还有内存文件系统  ramfs，网络文件系统 nfs 等等，不同的文件系统标准，需要使用不同的程序逻辑实现访问，对外提供的访问接口可能也稍有差异。但是我们在编写应用程序时，大都可以通过类似 `fopen`、`fread`、  `fwrite` 等 C 标准库函数访问文件，这都是虚拟文件系统的功劳。
+
+Linux 内核包含了文件管理子系统组件，它主要实现了虚拟文件系统 ( Virtual File System , VFS)，虚拟文件系统屏蔽了各种硬件上的差异以及具体实现的细节，为所有的硬件设备提供统一的接口，从而达到设备无关性的目的，同时文件管理系统还为应用层提供统一的 API 接口。
+
+在 Linux 下，一个与文件操作相关的应用程序结构如下图所示：
+
+![image-20241022094729684](.assets/image-20241022094729684.png)
+
+上图解构如下：
+
+- 应用层指用户编写的程序，如我们的 `hello.c`。
+
+- GNU C 库 ( glibc ) 即 C 语言标准库，例如在编译器章节介绍的 [`libc.so.6`](#8.1.3 glibc 库) 文件，它包含了
+
+    `printf`、`malloc`，以及本章使用的 `fopen`、`fread`、`fwrite` 等文件操作函数。
+
+- 用户程序和 glibc 库都是属于用户空间的，本质都是用户程序。
+- 应用层的程序和 glibc 可能会调用到 “ 系统调用层 ( SCI ) ” 的函数，这些函数是 Linux 内核  对外提供的函数接口，用户通过这些函数向系统申请操作。例如 C  库的 `printf` 函数使用了  系统的 `vsprintf` 和 `write` 函数，C 库的 `fopen`、`fread`、`fwrite` 分别调用了系统的 `open`、`read`、`write` 函数，具体可以阅读 glibc 的源码了解。
+- 由于文件系统种类非常多，跟文件操作相关的 `open`、`read`、`write` 等函数经过虚拟文件系统层，再访问具体的文件系统。
+
+总的来说，为了使不同的文件系统共存，Linux 内核在用户层与具体文件系统之前增加了虚拟文  件系统中间层，它对复杂的系统进行抽象化，对用户提供了统一的文件操作接口。无论是 ext2/3/4、  FAT32、NTFS 存储的文件，还是 `/proc`、`/sys` 提供的信息还是硬件设备，无论内容是在本地还是网络上，都使用一样的 `open`、`read`、`write` 来访问，使得 “ 一切皆文件 ” 的理念被实现，这也正是软件中间层的魅力。
+
+#### 11.4 Linux 系统调用
+
+从上图可了解到，系统调用 ( System Call ) 是操作系统提供给用户程序调用的一组 “ 特殊 ” 函数  接口 API，文件操作就是其中一种类型。实际上，Linux 提供的系统调用包含以下内容：
+
+- 进程控制：如 `fork`、`clone`、`exit` 、`setpriority` 等创建、中止、设置进程优先级的操作。
+- 文件系统控制：如 `open`、`read`、`write` 等对文件的打开、读取、写入操作。
+- 系统控制：如 `reboot`、`stime`、`init_module` 等重启、调整系统时间、初始化模块的系统操作。
+- 内存管理：如 `mlock`、`mremap` 等内存页上锁重、映射虚拟内存操作。
+- 网络管理：如 `sethostname`、`gethostname` 设置或获取本主机名操作。
+- socket 控制：如 `socket`、`bind`、`send` 等进行 TCP、UDP 的网络通讯操作。
+- 用户管理：如 `setuid`、`getuid` 等设置或获取用户 ID 的操作。
+- 进程间通信：包含信号量、管道、共享内存等操作。
+
+从逻辑上来说，系统调用可被看成是一个 Linux 内核与用户空间程序交互的中间人，它把用户进  程的请求传达给内核，待内核把请求处理完毕后再将处理结果送回给用户空间。它的存在就是为  了对用户空间与内核空间进行隔离，要求用户通过给定的方式访问系统资源，从而达到保护系统  的目的。
+
+也就是说，我们心心念念的 Linux 应用程序与硬件驱动程序之间，就是各种各样的系统调用，所  以无论出于何种目的，系统调用是学习 Linux 开发绕不开的话题。
+
+#### 11.5 文件操作（C 标准库）
+
+本小节讲解使用通用的 C 标准库接口访问文件，标准库实际是对系统调用再次进行了封装。使  用 C 标准库编写的代码，能方便地在不同的系统上移植。
+
+例如 Windows 系统打开文件操作的系统 API 为 `OpenFile`，Linux 则为 `open`，C 标准库都把它们封装为 `fopen`，Windows 下的 C 库会通过 `fopen` 调用 `OpenFile` 函数实现操作，而 Linux 下则通过 glibc  调用 `open` 打开文件。用户代码如果使用 `fopen`，那么只要根据不同的系统重新编译程序即可，而不需要修改对应的代码。
+
+##### 11.5.1 常用文件操作（C 标准库）
+
+在开发时，遇到不熟悉的库函数或系统调用，要**善用 man 手册**，而不要老是从网上查找。C 标准库提供的常用文件操作简介如下：
+
+###### 11.5.1.1 fopen 函数
+
+`fopen` 库函数用于打开或创建文件，返回相应的文件流。它的函数原型如下：
+
+```c
+#include <stdio.h>
+FILE *fopen(const char *pathname, const char *mode);
+```
+
+- `pathname` 参数用于指定要打开或创建的文件名
+
+- `mode` 参数用于指定文件的打开方式，注意该参数是一个字符串，输入时需要带双引号：
+    - `"r"` ：以只读方式打开，文件指针位于文件的开头。
+    - `“r+”` ：以读和写的方式打开，文件指针位于文件的开头。
+    - `“w”` ：以写的方式打开，不管原文件是否有内容都把原内容清空掉，文件指针位于文件的开头。
+    - `“w+”` ：同上，不过当文件不存在时，前面的 `“w”` 模式会返回错误，而此处的 `“w+”` 则会创建新文件。
+    - `“a”` ：以追加内容的方式打开，若文件不存在会创建新文件，文件指针位于文件的末尾。与  `“w+”` 的区别是它不会清空原文件的内容而是追加。
+    - `“a+”` ：以读和追加的方式打开，其它同上。
+    - `fopen` 的返回值是 FILE 类型的文件文件流，当它的值不为 NULL 时表示正常，后续的 `fread`、 `fwrite` 等函数可通过文件流访问对应的文件。
+
+###### 11.5.1.2 fread 函数
+
+`fread` 库函数用于从文件流中读取数据。它的函数原型如下：
+
+```c
+#include <stdio.h>
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+```
+
+`stream` 是使用 `fopen` 打开的文件流，`fread` 通过它指定要访问的文件，它从该文件中读取 `nmemb` 项数据，每项的大小为 `size`，读取到的数据会被存储在 `ptr` 指向的数组中。`fread` 的返回值为成功读取的项数 ( 项的单位为 `size` ) 。
+
+###### 11.5.1.3 fwrite 函数
+
+`fwrite` 库函数用于把数据写入到文件流。它的函数原型如下：
+
+```c
+#include <stdio.h>
+size_t fwrite(void *ptr, size_t size, size_t nmemb, FILE *stream);
+```
+
+ 它的操作与 `fread` 相反，把 `ptr` 数组中的内容写入到 `stream` 文件流，写入的项数为 `nmemb`，每项大小为 `size`，返回值为成功写入的项数 ( 项的单位为 `size` ) 。
+
+###### 11.5.1.4 fclose 函数
+
+`fclose` 库函数用于关闭指定的文件流，关闭时它会把尚未写到文件的内容都写出。因为标准库会对数据进行缓冲，所以需要使用 `fclose` 来确保数据被写出。它的函数原型如下：
+
+```c
+#include <unistd.h>
+int close(int fd);
+```
+
+###### 11.5.1.5 fflush 函数
+
+`fflush` 函数用于把尚未写到文件的内容立即写出。常用于确保前面操作的数据被写入到磁盘上。  `fclose` 函数本身也包含了 `fflush` 的操作。`fflush` 的函数原型如下：
+
+```c
+#include <stdio.h>
+int fflush(FILE *stream);
+```
+
+###### 11.5.1.6 fseek 函数
+
+`fseek` 函数用于设置下一次读写函数操作的位置。它的函数原型如下：
+
+```c
+#include <stdio.h>
+int fseek(FILE *stream, long offset, int whence);
+```
+
+其中的 `offset` 参数用于指定位置，`whence` 参数则定义了 `offset` 的意义，`whence` 的可取值如下：
+
+- SEEK_SET：`offset` 是一个绝对位置。
+- SEEK_END：`offset` 是以文件尾为参考点的相对位置。
+
+- SEEK_CUR：`offset` 是以当前位置为参考点的相对位置。
+
+##### 11.5.2 实验代码分析
+
+```c
+// path: base_linux/file_io/stdio/stdio.c
+#include <stdio.h>
+#include <string.h>
+
+// The string to be written
+const char buf[] = "filesystem_test: Hello World!\n";
+//　File Descriptors
+FILE *fp;
+char str[100];
+
+int main(void)
+{
+    // Create a file
+    fp = fopen("filesystem_test.txt", "w+");
+    // Return the file pointer normally
+    // Exception returns NULL
+    if (NULL == fp){
+        printf("Fail to Open File\n");
+        return 0;
+    }
+    // Write the contents of buf to a file
+    // Write 1 byte at a time, the total length is given by strlen
+    fwrite(buf, 1, strlen(buf), fp);
+    
+    // Writing to 'SprInec'
+    // Write 1 byte at a time, the total length is given by strlen
+    fwrite("SprInec\n", 1, strlen("SprInec\n"), fp);
+    
+    // Write the buffer data to the file immediately
+    fflush(fp);
+    
+    // At this point, the file pointer is at the end of the file.
+    // Use the `fseek` function to return the file pointer to the
+    // beginning of the file.
+    fseek(fp, 0, SEEK_SET);
+    
+    // Read the contents from the file into `str`
+    // Read 100 bytes each time, read 1 time
+    fread(str, 100, 1, fp);
+    
+    printf("File content: \n%s \n", str);
+    
+    fclose(fp);
+    
+    return 0;   
+}
+```
+
+其中的 `fopen` 函数调用时使用了参数 `“w+”`，表示每次都创建新的空文件，且带上读权限打开，函数调用后得到文件描述符 `fp`，在它后面的 `fwrite`、`fread`、`fflush` 等函数都是通过这个 `fp` 文件描述符访问该文件的。
+
+与下一小节中差异最大的就是此处 `fwrite` 和 `fread` 之间的 `fflush` 函数，C 标准库的文件系统带缓冲区，而系统调用的文件操作不带缓冲区，所以没有相应的 `flush` 函数。
+
+##### 11.5.3 Makefile 说明
+
+```makefile
+# path: base_linux/file_io/stdio/Makefile
+# Defining Variables
+TARGET = stdio
+
+# Defining the Compiler
+CC = gcc
+
+# Define the path of the header files
+CFLAGS = -I .
+
+# Define the header files
+DEPS = 
+
+# Define the object file
+OBJS = $(TARGET).o
+
+# Define the path of the object files
+BUILD_DIR = build
+
+# Target file
+$(TARGET): $(OBJS)
+        $(CC) -o $@ $^ $(CFLAGS)
+# Create a compilation output folder
+        @mkdir -p $(BUILD_DIR)
+# Move the .o file to the output folder
+        @mv *.o $(BUILD_DIR)
+# Copy the executable program to the output folder
+        @cp $(TARGET) $(BUILD_DIR)
+
+# Generation rules for *.o files
+%.o: %.c $(DEPS)
+        $(CC) -c -o $@ $< $(CFLAGS)
+
+# Phony target
+.PHONY: clean
+
+# make clean: Deleate the compilation results
+clean:
+# Delete the executable program
+        rm -f $(TARGET)
+# Delete the output folder
+        rm -rf $(BUILD_DIR)
+# Delete files created by program
+        rm -f filesystem_test.txt 
+```
+
+##### 11.5.4 编译及测试
+
+使用 make 编译程序：
+
+```bash
+make
+```
+
+执行程序：
+
+```bash
+./stdio
+```
+
+查看创建的文件：
+
+```bash
+cat filesystem_test.txt
+```
+
+![image-20241022112343420](.assets/image-20241022112343420.png)
+
+#### 11.6 文件操作（系统调用）
+
+Linux 提供的文件操作系统调用常用的有 `open`、`write`、`read`、`lseek`、`close` 等。
+
+##### 11.6.1 open 函数
+
+```c
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+int open(const char *pathname, int flags);
+int open(const char *pathname, int flags, mode_t mode);
+```
+
+Linux 使用 `open` 函数来打开文件，并返回该文件对应的文件描述符。函数参数的具体说明如下:
+
+- `pathname` ：要打开或创建的文件名
+
+- `flag` ：指定文件的打开方式，具体有以下参数：
+
+    |  标志位  | 含义                                                         |
+    | :------: | ------------------------------------------------------------ |
+    | O_RDONLY | 以只读的方式打开文件，该参数与 `O_WRONLY` 和 `O_RDWR` 只能三选一 |
+    | O_WRONLY | 以只写的方式打开文件                                         |
+    |  O_RDWR  | 以读写的方式打开文件                                         |
+    | O_CREAT  | 创建一个新文件                                               |
+    | O_APPEND | 将数据写入到当前文件的结尾处                                 |
+    | O_TRUNC  | 如果 `pathname` 文件存在，则清除文件内容                     |
+
+C 库函数 `fopen` 的 `mode` 参数与系统调用 `open` 的 `flags` 参数有如下表中的等价关系：
+
+| fopen 的 mode 参数 |       open 的 flags 参数        |
+| :----------------: | :-----------------------------: |
+|         r          |            O_RDONLY             |
+|         w          | O_WRONLY \| O_CREAT \| O_TRUNC  |
+|         a          | O_WRONLY \| O_CREAT \| O_APPEND |
+|         r+         |             O_RDWR              |
+|         w+         |   O_RDWR \|O_CREAT \| O_TRUNC   |
+|         a+         |  O_RDWR \| O_CREAT \| O_APPEND  |
+
+- `mode` ：当 `open` 函数的 `flag` 值设置为 `O_CREAT` 时，必须使用 `mode` 参数来设置文件与用户相关的权限。`mode` 可用的权限如下表所示，表中各个参数可使用 `|` 来组合:
+
+    |     \      | 标志位  | 含义                                     |
+    | :--------: | :-----: | ---------------------------------------- |
+    |  当前用户  | S_IRUSR | 用户拥有读权限                           |
+    |     \      | S_IWUSR | 用户拥有写权限                           |
+    |     \      | S_IXUSR | 用户拥有执行权限                         |
+    |     \      | S_IRWXU | 用户拥有读、写、执行权限                 |
+    | 当前用户组 | S_IRGRP | 当前用户组的其他用户拥有读权限           |
+    |     \      | S_IWGRP | 当前用户组的其他用户拥有写权限           |
+    |     \      | S_IXGRP | 当前用户组的其他用户拥有执行权限         |
+    |     \      | S_IRWXG | 当前用户组的其他用户拥有读、写、执行权限 |
+    |  其他用户  | S_IROTH | 其他用户拥有读权限                       |
+    |     \      | S_IWOTH | 其他用户拥有写权限                       |
+    |     \      | S_IXOTH | 其他用户拥有执行权限                     |
+    |     \      | S_IRWXO | 其他用户拥有读、写、执行权限             |
+
+##### 11.6,2 read 函数
+
+```c
+#include <unistd.h>
+ssize_t read(int fd, void *buf, size_t count);
+```
+
+`read` 函数用于从文件中读取若干个字节的数据，保存到数据缓冲区 `buf` 中，并返回实际读取的字节数,具体函数参数如下：
+
+- `fd` ：文件对应的文件描述符，可以通过 `fopen` 函数获得。另外，当一个程序运行时，Linux  默认有 0、1、2 这三个已经打开的文件描述符，分别对应了标准输入、标准输出、标准错误输出，即可以直接访问这三种文件描述符
+- `buf` ：指向数据缓冲区的指针
+- `count` ：读取多少个字节的数据
+
+##### 11.6.3 write 函数
+
+```c
+#include <unistd.h>
+ssize_t write(int fd, const void *buf, size_t count);
+```
+
+`write` 函数用于往文件写入内容，并返回实际写入的字节长度，具体函数参数如下：
+
+- `fd` ：文件对应的文件描述符，可以通过 `fopen` 函数获得
+- `buf` ：指向数据缓冲区的指针
+- `count` ：往文件中写入多少个字节
+
+##### 11.6.4 close 函数
+
+```c
+int close(int fd);
+```
+
+当我们完成对文件的操作之后，想要关闭该文件，可以调用 `close` 函数，来关闭该 `fd` 文件描述符对应的文件。
+
+##### 11.6.5 lseek 函数
+
+`lseek` 函数可以用与设置文件指针的位置，并返回文件指针相对于文件头的位置。其函数原型如下：
+
+```c
+off_t lseek(int fd, off_t offset, int whence);
+```
+
+它的用法与 `flseek` 一样，其中的 `offset` 参数用于指定位置，`whence` 参数则定义了 `offset` 的意义，  `whence` 的可取值如下：
+
+- SEEK_SET：`offset` 是一个绝对位置。
+- SEEK_END：`offset` 是以文件尾为参考点的相对位置。
+- SEEK_CUR：`offset` 是以当前位置为参考点的相对位置。
+
+#### 11.7 实验代码分析（系统调用）
+
+```c
+// path: base_linux/file_io/systemcall/systemcall.c
+#include <sys/stat.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+
+// File Descriptors
+int fd;
+char str[100];
+
+int main(void)
+{
+    // Create a file
+    fd = open("testscript.sh", O_RDWR|O_CREAT|O_TRUNC, S_IRWXU);
+    // The file descriptor `fd` is a non-negative integer
+    if (fd < 0){
+        printf("Fail to Open File\n");
+        return 0;
+    }
+    
+    // Write string `pwd`
+    write(fd, "pwd\n", strlen("pwd\n"));
+    
+    // Write string `ls`
+    write(fd, "ls\n", strlen("ls\n"));
+    
+    // At this point, the file pointer is at the end of the file.
+    // Use the `lseek` function to return the file pointer to the
+    // beginning of the file.
+    lseek(fd, 0, SEEK_SET);
+    
+    // Read 100 byte from file into str, this function returns the
+    // number of bytes actually read
+    read(fd, str, 100);
+    
+    printf("File content:\n%s \n", str);
+    
+    close(fd);
+    
+    return 0;
+}
+```
+
+##### 11.7.1 执行流程
+
+本实验与 C 库文件操作类似，也是创建文件、写入内容然后读出，不过此处使用的都是系统调用函数如 `open`、`write`、`lseek`、`read`、`close`，具体说明如下：
+
+- 代码中先调用了 `open` 函数以可读写的方式打开一个文本文件，并且 `O_CREAT` 指定如果文  件不存在，则创建一个新的文件，文件的权限为 `S_IRWXU`，即当前用户可读可写可执行，当前用户组和其他用户没有任何权限。
+- `open` 与 `fopen` 的返回值功能类似，都是文件描述符，不过 `open` 使用非负整数来表示正常，失败时返回 `-1`，而 `fopen` 失败时返回 `NULL`。
+- 创建文件后调用 `write` 函数写入了 `”pwd\n“`、`“ls\n”` 这样的字符串，实际上就是简单的 Shell  命令。
+- 使用 `read` 函数读取内容前，先调用 `lseek` 函数重置了文件指针至文件开头处读取。与 C 库文件操作的区别 `write` 和 `read` 之间不需要使用 `fflush` 确保缓冲区的内容并写入，因为系统调用的文件操作是没有缓冲区的。
+- 最后关闭文件,释放文件描述符。
+
+##### 11.7.2 头文件目录
+
+在 Linux 中，大部分的头文件在系统的 `/usr/include` 目录下可以找到，它是系统自带的 GCC 编译器默认的头文件目录，如下图所示，如果把该目录下的 `stdio.h` 文件删除掉或更改名字 ( 想尝试请备份 ) ，那么使用 GCC 编译 `hello world` 的程序会因为找不到 `stdio.h` 文件而报错。
+
+![image-20241022123646528](.assets/image-20241022123646528.png)
+
+代码中一些头文件前包含了某个目录，比如 `sys/stat.h`，这些头文件可以在编译器文件夹中的目录下找到。我们通常可以使用 `locate` 命令来搜索，如：
+
+安装 `locate` 工具：
+
+```bash
+sudo apt install locate
+```
+
+更新数据：
+
+```bash
+sudo updatedb
+```
+
+使用 `locate` 查找头文件路径：
+
+```bash
+locate sys/stat.h
+```
+
+![image-20241022130652226](.assets/image-20241022130652226.png)
+
+- `/media/sprine/2e949fa5-ddf3-4f3d-85fb-9459e14412b5/usr/include/aarch64-linux-gnu/sys/stat.h  `，该开发板自带 128G 的 emmc，出厂内置系统，该路径为 emmc 内置系统路径。
+- `/usr/include/aarch64-linux-gnu/sys/stat.h `，该路径为本开发板目前使用的 64G tf卡内置系统路径。
+
+##### 11.7.3 常用头文件
+
+我们常常会用到以下头文件，此处进行简单说明，若想查看具体的头文件内容,  使用 `locate` 命令找到该文件目录后打开即可：
+
+- `stdio.h` ：C 标准输入与输出 ( standard input & output ) 头文件，我们经常使用的打印  函数 `printf` 函数就位于该头文件中。
+- `stdlib.h` ：C 标准库 ( standard library ) 头文件，该文件包含了常用的 `malloc` 函数、`free`  函数。
+- `sys/stat.h` ：包含了关于文件权限定义，如 `S_IRWXU`、`S_IWUSR`，以及函数 `fstat` 用于  查询文件状态。涉及系统调用文件相关的操作，通常都需要用到 `sys/stat.h` 文件。
+- `unistd.h` ：UNIX C 标准库头文件，unix，linux 系列的操作系统相关的 C 库，定义了  unix 类系统 POSIX 标准的符号常量头文件，比如 Linux 标准的输入文件描述符 ( STDIN ) ，标准输出文件描述符 ( STDOUT ) ，还有 `read`、`write` 等系统调用的声明。
+- `fcntl.h` ：unix 标准中通用的头文件，其中包含的相关函数有 `open`，`fcntl`，`close` 等操作。
+- `sys/types.h` ：包含了 Unix/Linux 系统的数据类型的头文件，常用的有 `size_t`，`time_t`，  `pid_t` 等类型。
+
+#### 11.8 编译及测试（系统调用）
+
+本实验使用的 Makefile 与 [C 标准库实验的 Makefile](#11.5.3 Makefile 说明) 几乎一模一样：
+
+```makefile
+# path: base_linex/file_io/systemcall/Makefile
+# Defining Variables
+TARGET = systemcall
+
+# Defining the Compiler
+CC = gcc
+
+# Define the path of the header files
+CFLAGS = -I .
+
+# Define the header files
+DEPS = 
+
+# Define the object file
+OBJS = $(TARGET).o
+
+# Define the path of the object files
+BUILD_DIR = build
+
+# Target file
+$(TARGET): $(OBJS)
+        $(CC) -o $@ $^ $(CFLAGS)
+# Create a compilation output folder
+        @mkdir -p $(BUILD_DIR)
+# Move the .o file to the output folder
+        @mv *.o $(BUILD_DIR)
+# Copy the executable program to the output folder
+        @cp $(TARGET) $(BUILD_DIR)
+
+# Generation rules for *.o files
+%.o: %.c $(DEPS)
+        $(CC) -c -o $@ $< $(CFLAGS)
+
+# Phony target
+.PHONY: clean
+
+# make clean: Deleate the compilation results
+clean:
+# Delete the executable program
+        rm -f $(TARGET)
+# Delete the output folder
+        rm -rf $(BUILD_DIR)
+# Delete files created by program
+        rm -f testscript.sh 
+```
+
+在终端输入以下命令进行编译与运行：
+
+```bash
+make
+tree
+./systemcall
+ls
+cat testscript.sh
+./testscript.sh
+```
+
+![image-20241022150434749](.assets/image-20241022150434749.png)
+
+从上图可看到，`systemcall` 程序执行后，它创建的 `testscript.sh` 文件带有可执行权限，运行 `./testscript.sh` 可执行该脚本。
+
+#### 11.9 如何抉择
+
+既然 C 标准库和系统调用都能够操作文件，那么应该选择哪种操作呢？考虑的因素如下：
+
+- 使用系统调用会影响系统的性能。执行系统调用时，Linux 需要从用户态切换至内核态，执  行完毕再返回用户代码，所以减少系统调用能减少这方面的开销。如库函数写入数据的文件操作 `fwrite` 最后也是执行了 `write` 系统调用，**如果是写少量数据的话，直接执行 `write` 可能会更高效，但如果是频繁的写入操作，由于 `fwrite` 的缓冲区可以减少调用 `write` 的次数,  这种情况下使用 `fwrite` 能更节省时间。**
+- 硬件本身会限制系统调用本身每次读写数据块的大小。如针对某种存储设备的 `write` 函数每次可能必须写 4kB 的数据，那么当要写入的实际数据小于 4kB 时，`write` 也只能按 4kB 写入，浪费了部分空间，而带缓冲区的 `fwrite` 函数面对这种情况，会尽量在满足数据长度要求时才执行系统调用，减少空间开销。
+- 也正是由于库函数带缓冲区，使得我们无法清楚地知道它何时才会真正地把内容写入到硬件上，所以在**需要对硬件进行确定的控制时，我们更倾向于执行系统调用**。
+
+### 12. 调试工具
+
+#### 12.1 gdb
+
+经典的调试工具，功能很强大。
+
+注意若要使用 gdb 调试，编译的时候需要增加 `-g` 选项,并用 `-Og` 进行优化。多线程下可以 `attach` 到进程来调试。  在命令行中输入 `gdb` 进入 gdb 命令行模式。 
+
+gdb 具有大量命令调试，这里不能将其一一列举，介绍一些常用的基础命令：
+
+表 12.1 - 1：
+
+|   命令    | 缩写 |      用法       | 作用                                                         |
+| :-------: | :--: | :-------------: | ------------------------------------------------------------ |
+|   start   |      |      start      | 开始执行程序，在 `main` 函数的第一条语句前面停下来           |
+|   file    |      |    file xxx     | 打开调试的文件                                               |
+|    run    |  r   |       ru        | 运行程序（ 第一条语句开始运行 ）                             |
+|   break   |  b   | 见下表 12.1 - 2 | 设置断点                                                     |
+| continue  |  c   |        c        | 继续程序的运行，直到遇到下一个断点                           |
+|   list    |  l   | 见下表 12.1 - 3 | 显示多行源代码                                               |
+|   step    |  s   |        s        | 执行下一条语句，如果该语句为函数调用，则进入函数执行其中的第一条语句 |
+|   next    |  n   |        n        | 执行下一条语句，如果该语句为函数调用，不会进入函数内部执行 ( 即不会一步步地调试函数内部语句 ) |
+|  display  | disp |     disp n      | 跟踪查看某个变量，每次停下来都显示它的值                     |
+|   print   |  p   |     p / p n     | 打印内部变量值                                               |
+|   watch   |      |      watch      | 监视变量值的变化                                             |
+| backtrace |  bt  |       bt        | 查看函数调用信息 (堆栈)                                      |
+|   frame   |  f   |        f        | 查看栈帧                                                     |
+|   quit    |  q   |        q        | 退出 GDB 环境                                                |
+|   kill    |  k   |        k        | 终止正在调试的程序                                           |
+| 设置变量  |      |   set var = x   | 设置变量的值                                                 |
+|  return   |      |    return x     | 结束当前调用函数并返回指定值，到上一层函数调用处停止程序执行 |
+|  finish   |  fi  |       fi        | 结束当前正在执行的函数，并在跳出函数后暂停程序的执行         |
+|   jump    |  j   |       j x       | 结束当前调用函数井返回指定值，到上一层函数调用处停止程序执行 |
+
+表 12.1 - 2：
+
+|         命令         | 功能                                                     |
+| :------------------: | -------------------------------------------------------- |
+|       break n        | 设置第几行作为断点（ 搭配 `list` 使用 ）                 |
+|   info breakpoints   | 列出所加的断点                                           |
+| delete breakpoints n | 删除第 n 个断点 ( n 为 `info breakpoints` 获得的断点号 ) |
+|   disable/enable n   | 表示使得编号为 n 的断点暂时失效或有效                    |
+
+表 12.1 - 3：
+
+|       命令        | 功能                                                         |
+| :---------------: | ------------------------------------------------------------ |
+|       list        | 默认情况下， 一次显示 10 行，第一次使用时，从代码其实位置显示 |
+|      list n       | 显示以第 n 行为中心的 10 行代码                              |
+| list functionname | 显示以 `functionname` 的函数为中心的 10 行代码               |
+|      list -       | 显示刚才打印过的源代码之前的代码                             |
+
+#### 12.2 strace
+
+strace 是一个用来跟踪系统调用的简易工具。
+
+它最简单的用途就是跟踪一个程序整个生命周期里所有的系统调用，并把调用参数和返回值以  文本的方式输出。Strace 还可以跟踪发给进程的信号，支持 `attach` 正在运行的进程 `strace -p <pid>`。
+
+当多线程环境下，需要跟踪某个线程的系统调用，可以先 `ps -efL | grep <Process Name>`  查找出该进程下的线程，然后调用 `strace –p <pid>` 进行分析。
+
+安装 strace 工具：
+
+```bash
+sudo apt install strace
+```
+
+下面是使用 strace 跟踪 [8.2 hello world](#8.2.2 编写代码文件) 程序的演示：
+
+```bash
+strace ./hello
+```
+
+![image-20241022153242801](.assets/image-20241022153242801.png)
+
+![image-20241022153344955](.assets/image-20241022153344955.png)
+
+以下输出内容为配置程序的运行环境，以及调用相应的库：
+
+```bash
+execve("./hello", ["./hello"], 0xffffdb9e98a0 /* 47 vars */) = 0
+brk(NULL)                               = 0xaaab239fb000
+...
+openat(AT_FDCWD, "/lib/aarch64-linux-gnu/libc.so.6", O_RDONLY|O_CLOEXEC)=3
+...
+getrandom("\xc0\x64\xf7\x77\xd5\x0a\xb0\x58", 8, GRND_NONBLOCK) = 8
+brk(NULL)                               = 0xaaab239fb000
+brk(0xaaab23a1c000)                     = 0xaaab23a1c000
+```
+
+- `/lib/aarch64-linux-gnu/libc.so.6` 就是我们前面章节所说的 glibc 的库文件，这些配置环境的操作，保护了我们的系统免受程序的干扰。
+
+- 比如，有些软件想改写我们的系统文件或者破坏我们的系统，在这些保护环境下，系统不会允许程序运行超过系统规定的运行空间，即便是程序无意改写系统的文件 ( 超出了运行空间 ) ，系统会阻止它。如果程序进入死循环或崩溃了，系统可以依赖这些保护措施免受干扰并可以直接终止程序的运行。
+
+以下是我们的程序主体部分：
+
+```bash
+write(1, "hello, world! This is a C progra"..., 35hello, world! This is a C program.
+) = 35
+write(1, "output i=0\n", 11output i=0
+)            = 11
+...
+...
+...
+write(1, "output i=9\n", 11output i=9
+)            = 11
+exit_group(0)                           = ?
++++ exited with 0 +++
+```
+
+代码输出格式有误，可能是多线程导致格式有点问题，正确的格式如下：
+
+```bash
+write(1, "hello, world! This is a C program.\n", 35) = 35
+hello, world! This is a C program.
+
+write(1, "output i=0\n", 11) = 11
+output i=0
+```
+
+- 为什么 `write(1, “hello, world! This is a C program.n”, 35)=35` 就可以向屏幕输出文字呢，因为 linux 系统把输出到命令行抽象成文件描述符，操作文件描述符就可以操作该设备。
+
+    查看描述符：
+
+    ```bash
+    ls -l /dev/std*
+    ```
+
+    ![image-20241022155219694](.assets/image-20241022155219694.png)
+
+    - `stdin` 标准输入 ​ `fd=0`  从终端设备输入内容
+    - `stdout` 标准输出 `fd=1` 从终端设备输出内容
+    - `stderr` 标准错误 `fd=2` 从终端设备输出命令的错误消息
+
+    ```bash
+    write(1, "output i=0\n", 11) = 11
+    output i = 0
+    ```
+
+    - `write` ：写入东西
+    - `1` ：文件描述符，这里表示标准输出，即向终端输出东西
+    - `“output i=0\n”` ：要输出的内容
+    - `11` ：输出内容的字节大小，加上空格和换行符刚好 11 个
+    - `= 11` ：`write` 函数返回值，表示写入了多少个字节
+
+我们也可以用 `write` 代替 `printf` 试试：
+
+```c
+// path: base_linux/hello/hello_sys/hello_sys.c
+#include <unistd.h>
+
+int main(void)
+{
+	write(1, "hello, world! This is a C program.\n", 35);
+	write(1, "output i=0\n", 11);
+	return 0;
+}
+```
+
+```makefile
+# path: base_linux/hello/hello_sys/Makefile
+TARGET = hello_sys
+CC = gcc
+CFLAGS = -I .
+DEPS = 
+OBJS = $(TARGET).o
+BUILD_DIR = build
+
+$(TARGET): $(OBJS)
+        $(CC) -o $@ $^ $(CFLAGS)
+        @mkdir -p $(BUILD_DIR)
+        @mv *.o $(BUILD_DIR)
+        @cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+        $(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+        rm -f $(TARGET)
+        rm -rf $(BUILD_DIR)
+```
+
+在终端输入命令进行编译与运行：
+
+```bash
+make
+./hello_sys
+```
+
+![image-20241022162826037](.assets/image-20241022162826037.png)
 
 
 
@@ -2695,6 +3559,38 @@ ssh-keygen -t rsa
 ![image-20241019095246534](.assets/image-20241019095246534.png)
 
 
+
+### C 指针中使用 const 位置不同的区别
+
+```c
+const char *p;
+```
+
+- `p` 是一个指向 `const char` 的指针。
+- 可以通过 `p` 修改指针的指向，但不能通过 `*p` 修改指向的内容。
+
+```c
+char * const p;
+```
+
+- `p` 是一个常量指针，指向 `char`。
+
+- 不能修改指针 `p` 的指向，但可以通过 `*p` 修改指向的内容。
+
+```c
+char const *p;
+```
+
+- 这是 `const char *p;` 的另一种写法，含义相同。
+- `p` 是一个指向 `const char` 的指针，不能通过 `*p` 修改指向的内容。
+
+```c
+const * char p;
+```
+
+- 这种写法是错误的，语法不正确。`const` 不能单独用于指针类型，应该放在类型前面或后面。
+
+    
 
 ## ERROR LOG
 
