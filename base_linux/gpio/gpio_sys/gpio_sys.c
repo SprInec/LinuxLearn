@@ -52,11 +52,13 @@ int gpio_deinit(char *name)
     return 0;
 }
 
-int gpio_set(char *name, int value)
+int gpio_set(char *name, char value)
 {
     int fd;
     sprintf(gpio_path, "/sys/class/gpio/gpio%s/value", name);
-    if (fd < 0){
+    fd = open(gpio_path, O_WRONLY);
+    if (fd < 0)
+    {
         printf("open %s wrong\n", gpio_path);
         return -1;
     }
@@ -64,13 +66,13 @@ int gpio_set(char *name, int value)
     if (1 == value)
     {
         if (2 != write(fd, "1", sizeof("1"))){
-            printf("wrong set\n");
+            printf("wrong set \n");
         }
     }
     else if (0 == value)
     {
         if (2 != write(fd, "0", sizeof("0"))){
-            printf("wrong set\n");
+            printf("wrong set \n");
         }
     }
     close(fd);
