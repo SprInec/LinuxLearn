@@ -1,9 +1,9 @@
-TARGET = gpio_sys
+TARGET = gpio_system
 CC = gcc
 CFLAGS = -I .
 DEPS = 
-OBJS = $(TARGET).o
 BUILD_DIR = build
+OBJS = $(TARGET).o
 
 $(TARGET): $(OBJS)
 	$(CC) -o $@ $^ $(CFLAGS)
@@ -19,3 +19,4 @@ $(TARGET): $(OBJS)
 clean:
 	rm -f $(TARGET)
 	rm -rf $(BUILD_DIR)
+	
