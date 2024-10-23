@@ -381,6 +381,10 @@ sudo ufw allow ssh
 
 - `id` ：查看当前用户的 UID 值
 
+- `dpkg` ：是 Debian Linux 系统用来安装、创建和管理软件包的实用工具。
+    - `-L` ：显示于软件包关联的文件
+
+
 
 
 - `sudo` ：管理员权限
@@ -1953,7 +1957,7 @@ Makefile 中跟目标相关的语法：
 
 - **依赖** ：要达成目标需要依赖的某些文件或其它目标。例如前面的 `targeta` 依赖于 `targetb` 和  `targetc`，又如在编译的例子中，`hello_main` 依赖于 `hello_main.c`、`hello_func.c` 源文件，若这些文件更新了会重新进行编译。
 
-- **命令 1，命令 2 ⋯ 命令 n** ：make 达成目标所需要的命令。只有当目标不存在或依赖文件的修改时间比目标文件还要新时，才会执行命令。要特别注意**命令的开头要用 `Tab` 键，不能使用空格代替**，有的编辑器会把 `Tab` 键自动转换成空格导致出错，若出现这种情况请检查自己的编辑器配置。
+- **命令 1，命令 2 ⋯ 命令 n** ：make 达成目标所需要的命令。只有当目标不存在或依赖文件的修改时间比目标文件还要新时，才会执行命令。要特别注意**命令的开头要用 `Tab` 键，不能使用空格代替**，有的编辑器会把 `Tab` 键自动转换成空格导致[出错](#make 编译报错 *** missing separator.  Stop.)，若出现这种情况请检查自己的编辑器配置。**OTHER - [VSCode 中将默认的空格缩进更改为 Tab 缩进](#VSCode 中将默认的空格缩进更改为 Tab 缩进)**
 
 #### 10.5 伪目标
 
@@ -3437,50 +3441,440 @@ exit
 
 ```c
 // path: base_linux/gpio/gpio_sys/gpio_sys.c
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
 
+#define GPIO_INDEX "42"
+
+static char gpio_path[75];
+
+int gpio_init(char *name)
+{
+    int fd;
+    // index config
+
+    sprintf(gpio_path, "/sys/class/gpio/gpio%s", name);
+    if (access("gpio_path", F_OK))
+    {
+        fd = open("/sys/class/gpio/export", O_WRONLY);
+        if (fd < 0){
+            return 1;
+        }
+
+        write(fd, name, strlen(name));
+        close(fd);
+
+        // direction config
+        sprintf(gpio_path, "/sys/class/gpio/gpio%s/direction", name);
+        fd = open(gpio_path, O_WRONLY);
+        if (fd < 0){
+            return 2;
+        }
+
+        write(fd, "out", strlen("out"));
+        close(fd);
+    }
+
+    return 0;
+}
+
+int gpio_deinit(char *name)
+{
+    int fd;
+    fd = open("/sys/class/gpio/unexport", O_WRONLY);
+    if (fd < 0){
+        return 1;
+    }
+
+    write(fd, name, strlen(name));
+    close(fd);
+
+    return 0;
+}
+
+int gpio_set(char *name, int value)
+{
+    int fd;
+    sprintf(gpio_path, "/sys/class/gpio/gpio%s/value", name);
+    if (fd < 0){
+        printf("open %s wrong\n", gpio_path);
+        return -1;
+    }
+
+    if (1 == value)
+    {
+        if (2 != write(fd, "1", sizeof("1"))){
+            printf("wrong set\n");
+        }
+    }
+    else if (0 == value)
+    {
+        if (2 != write(fd, "0", sizeof("0"))){
+            printf("wrong set\n");
+        }
+    }
+    close(fd);
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    char buf[10];
+    int res;
+
+    // Verify the parameters
+    if (2 != argc){
+        printf("usage: %s <PinNum>\n", argv[0]);
+        return -1;
+    }
+
+    res = gpio_init(argv[1]);
+    if (res){
+        printf("gpio init error, code = %d\n", res);
+        return 0;
+    }
+
+    while(1){
+        printf("Please input the value: 0--low 1--high q--exit\n");
+        scanf("%10s", buf);
+
+        switch (buf[0])
+        {
+        case '0':
+            gpio_set(argv[1], 0);
+            break;
+
+        case '1':
+            gpio_set(argv[1], 1);
+            break;
+
+        case 'q':
+            gpio_deinit(argv[1]);
+            printf("Exit\n");
+            return 0;
+
+        default:
+            break;
+        }
+    }
+
+    return 0;
+}
 ```
 
+本代码要特别注意的是 `export` 和 `unexport` 文件是只有写权限的，所以通过 `open` 打开时要使用 `O_WRONLY` 标志以写入方式打开，不能使用 `O_RDWR` 等带读模式的标志。
 
+编写 Makefile 文件：
 
+```makefile
+# path: base_linux/gpio/gpio_sys/Makefile
+TARGET = gpio_sys
+CC = gcc
+CFLAGS = -I .
+DEPS = 
+OBJS = $(TARGET).o
+BUILD_DIR = build
 
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
 
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
+.PHONY: clean
 
+clean:
+	rm -f $(TARGET)
+	rm -rf $(BUILD_DIR)
+```
 
+编译并运行程序：
 
+```bash
+make
+sudo ./gpio_sys 36
+```
 
+![image-20241023171334752](.assets/image-20241023171334752.png)
 
+#### 13.4 使用 libgpiod 控制 IO
 
+libgpiod 是一种字符设备接口，GPIO 访问控制是通过操作字符设备文件（ 如 `/dev/gpiodchip0` ）实现的，并通过 libgpiod 提供一些命令工具、c  库以及 python 封装。
 
+想要使用 libgpiod，需要在板卡上安装 libgpiod 库。
 
+```bash
+# 安装 libgpiod 库及头文件
+sudo apt install libgpiod-dev
 
+# 安装 gpiod 命令行工具
+sudo apt install gpiod
+```
 
+##### 13.4.1 命令行控制
 
+常用的命令行如下，可使用 `-h` 查看命令相对应的使用说明（以 GPIO1_A4 为例）：
 
+|    命令    | 作用                       |      使用举例      | 说明                                |
+| :--------: | -------------------------- | :----------------: | ----------------------------------- |
+| gpiodetect | 列出所有的 GPIO 控制器     | gpiodetect(无参数) | 列出所有的 GPIO 控制器              |
+|  gpioinfo  | 列出 gpio 控制器的引脚情况 |     gpioinfo 1     | 列出第一组控制器引脚组情况          |
+|  gpioset   | 设置 gpio                  |   gpioset 1 4=0    | 设置第一组控制器编号 4 引脚为低电平 |
+|  gpioget   | 获取 gpio 引脚状态         |    gpioget 1 4     | 获取第一组控制器编号 4 的引脚状态   |
+|  gpiomon   | 监控 gpio 的状态           |    gpiomon 1 4     | 监控第一组控制器编号 4 的引脚状态   |
 
+> **:small_red_triangle_down:IMPORTANT**
+>
+> Rockchip Pin 的 ID 按照控制器 ( bank ) + 端口 ( port ) + 索引序号 ( pin ) 组成。其中端口号和索引号会合并成一个数值传入到 gpiod 里去并不是所有的引脚都能够使用 libgpiod 控制，例如 led 之类的一些已经被使用的引脚。
 
+##### 13.4.2 使用 libgpiod 编程
 
+可通过以下命令找到头文件：
 
+```bash
+dpkg -L libgpiod-dev
+```
 
+![image-20241023173906260](.assets/image-20241023173906260.png)
 
+查找结果中的 `gpiod.h`、`libgpiod.so` 和 `libgpiod.a` 就是板卡使用的头文件、动态和静态链接库。
 
+常用的 libgpiod API ( C 库 ) 如下所示：
 
+```c
+//成员变量
+struct gpiod_chip; //GPIO 组句柄
+struct gpiod_line; //GPIO 引脚句柄
 
+//获取GPIO 控制器(GPIO 组)
+struct gpiod_chip *gpiod_chip_open(const char *path);
 
+//获取GPIO 引脚
+struct gpiod_line *gpiod_chip_get_line(struct gpiod_chip *chip, unsigned
+int offset);
 
+//设置引脚方向为输入模式
+int gpiod_line_request_input(struct gpiod_line *line,const char *consumer);
 
+//设置引脚为输出模式
+int gpiod_line_request_output(struct gpiod_line *line,const char *consumer, int default_val)
 
+//设置引脚的高低电平
+int gpiod_line_set_value(struct gpiod_line *line, int value);
 
+//读取引脚状态
+int gpiod_line_get_value(struct gpiod_line *line);
 
+//释放GPIO 引脚
+void gpiod_line_release(struct gpiod_line *line);
 
+//关闭GPIO 组句柄并释放所有分配的资源。
+void gpiod_chip_close(struct gpiod_chip *chip);
+```
 
+##### 13.4.3 程序编写
 
+```c
+// path: base_linux/gpio/gpio_lib/gpio_lib.c
+#include <gpiod.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
 
+int main(int argc, char **argv)
+{
+    int i;
+    int ret;
+    char buf[10];
 
+    // GPIO Controller Handle
+    struct gpiod_chip *chip;
+    //  GPIO Pin Handle
+    struct gpiod_line *line;
 
+    // Get GPIO Controller
+    chip = gpiod_chip_open("/dev/gpiochip1");
+    if (NULL == chip){
+        printf("gpiod_chip_open error\n");
+        return -1;
+    }
 
+    // Get GPIO Pin
+    line = gpiod_chip_get_line(chip, 8);
+    if (NULL == line){
+        printf("gpiod_chip_get_line error\n");
+        goto release_line;
+    }
 
+    // Set GPIO to output mode
+    ret = gpiod_line_request_output(line, "led", 0);
+    if (ret < 0){
+        printf("gpiod_line_request_output error\n");
+        goto release_chip;
+    }
 
+    for (i = 0; i < 10; i++)
+    {
+        gpiod_line_set_value(line, 1);
+        printf("set pin value to 1.\n");
+        usleep(500000);
+        printf("set pin value to 0.\n");
+        gpiod_line_set_value(line, 0);
+        usleep(500000);
+    }
+
+release_line: 
+    // Release GPIO pin
+    gpiod_line_release(line);
+release_chip:
+    // Release GPIO controller
+    gpiod_chip_close(chip);
+
+    return 0;
+}
+```
+
+- `usleep()` ：是一个在 Linux 中用于暂停执行的函数，其功能是将当前线程挂起指定的微秒数。
+
+安装 `pkg-config` 工具：
+
+```bash
+sudo apt install pkg-config
+```
+
+编写 Makefile 文件:
+
+```makefile
+# path: base_linux/gpio/gpio_lib/Makefile
+# Defining variables
+TARGET = gpio_lib
+
+# Defining compiler
+CC = gcc
+
+# Defining the path of the header files
+CFLAGS = -I .
+
+# Defining the objects files
+OBJS = $(TARGET).o
+
+# Defining the include files
+DEPS = 
+
+# Defining the storage location of .o files
+BUILD_DIR = build
+
+# Adding additional libraries
+LIBGPIOD = `pkg-config --cflags libgpiod` `pkg-config --libs libgpiod`
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBGPIOD)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS) $(LIBGPIOD)
+
+.PHONY: clean
+
+clean:
+	rm -f $(TARGET)
+	rm -rf $(BUILD_DIR)
+```
+
+编译并运行：
+
+```bash
+make
+sudo ./gpio_lib
+```
+
+或者使用 `gcc` 命令编译：
+
+```bash
+gcc gpio_lib.c -o gpio_lib `pkg -config --cflags libgpiod` `pkg -config --libs libgpiod`
+sudo ./gpio_lib
+```
+
+#### 13.5 systerm 编程
+
+```c
+// path: base_linux/gpio/gpio_system/gpio_system.c
+#include <sys/types.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void)
+{
+    pid_t result;
+    int i;
+    for (i = 0; i < 10; i++)
+    {
+        result = system("gpioset 1 8=1");
+        usleep(500000);
+        result = system("gpioset 1 8=0");
+        usleep(500000);
+    }
+
+    return result;
+}
+```
+
+该代码的原理是在 C 程序中使用 `system()` 相当于在 shell 终端里使用命令，需要 root 权限执行。
+
+缺点：这种方法控制 `io` 会涉及到内核的上下文切换，会影响到内核的处理。因此，不推荐使用
+这种方法在短时间内多次操作 GPIO。如果对 GPIO 有多次操作，可以使用 [`gpio_lib.c`](#13.4.3 程序编写)，速度更快，效率更高。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/gpio/gpio_system/Makefile
+TARGET = gpio_system
+CC = gcc
+CFLAGS = -I .
+DEPS = 
+BUILD_DIR = build
+OBJS = $(TARGET).o
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(TARGET)
+	rm -rf $(BUILD_DIR)
+```
+
+编译并执行:
+
+```bash
+make
+sudo ./gpio_system
+```
+
+![image-20241023215017683](.assets/image-20241023215017683.png)
+
+### 14. input 子系统
+
+本节的代码目录为：`base_linux/ev_test`
+
+#### 14.1 input 子系统简介
 
 
 
@@ -3800,6 +4194,16 @@ const * char p;
 
     
 
+### VSCode 中将默认的空格缩进更改为 Tab 缩进
+
+用 VSCode 打开任意文件，在窗口的底栏中找到 **`制表符长度: x`** 并单击：
+
+![image-20241023184719771](.assets/image-20241023184719771.png)
+
+在弹出的菜单栏中选择 **`使用制表符缩进`**即可。
+
+
+
 ## ERROR LOG
 
 ### VMWare 虚拟机共享文件夹不显示
@@ -3885,3 +4289,16 @@ ls
     确保路径正确，如果交换文件在其他位置，请相应调整路径。
 
 4. **重新打开文件**： 可以重新打开 `test.txt` 文件，确认没有问题。
+
+    
+
+### make 编译报错 *** missing separator.  Stop.
+
+- [x] 2024.10.23 18:42
+
+```bash
+Makefile:23: *** missing separator.  Stop.
+```
+
+这个错误通常是由于 Makefile 中的缩进问题导致的。Makefile 要求使用制表符（Tab）而不是空格来缩进命令。相关配置见 **OTHER - [VSCode 中将默认的空格缩进更改为 Tab 缩进](#VSCode 中将默认的空格缩进更改为 Tab 缩进)**
+
