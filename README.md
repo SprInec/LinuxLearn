@@ -219,8 +219,6 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 > **参考书籍：** [[野火]《Linux基础与应用开发实战指南—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/linux_base/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
->
-> **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
 
 ### 1. 配置网络
 
@@ -3876,6 +3874,254 @@ sudo ./gpio_system
 
 #### 14.1 input 子系统简介
 
+input 子系统是 Linux 对输入设备提供的统一驱动框架。
+
+如按键、键盘、触摸屏和鼠标等输入设备的驱动方式是类似的，当出现按键、触摸等操作时，硬件产生中断，然后 CPU 直接读取引脚电平，或通过 SPI、I2C 等通讯方式从设备的寄存器读取具体的按键值或触摸坐标，然后把这些信息提交给内核。
+
+使用 input 子系统驱动的输入设备可以通过统一的数据结构提交给内核，该数据结构包括输入的时间、类型、代号以及具体的键值或坐标，而内核则通过 `/dev/input` 目录下的文件接口传递给用户空间。
+
+在Linux 内核源码的 `Documentation/input` 目录包含了input 子系统相关的说明。
+
+在板卡默认的出厂镜像中，按键、触摸屏、鼠标、键盘都使用了 input 子系统驱动。
+
+#### 14.2 input 事件目录
+
+##### 14.2.1 使用 evtest 工具测试
+
+在开发 input 子系统驱动时，常常会使用 `evtest` 工具进行测试，我们可以通过该工具来了解板卡上的输入设备。
+
+```bash
+sudo apt install evtest
+sudo evtest
+```
+
+![image-20241024093324866](.assets/image-20241024093324866.png)
+
+- 运行 `evtest` 工具，它列出了系统当前可用的 `/dev/input/event0~11` 输入事件文件，并且列出了这些事件对应的设备名。
+- 输入要测试的设备编号后它列出了 `event9` 的一些设备信息，包括驱动版本、设备ID、设备名、支持的事件类型、事件代号以及输入值的取值范围。
+- 移动 2.4G 鼠标，可以看到它输出了详细的事件信息。输出信息中每一行包含了鼠标上报事件的具体时间 `time`、事件类型 `type 2`（EV_REL）、事件代号 `code1` 或 `code0`（REL_Y  或 REL_X）和具体的值 `value`，该值就是鼠标 X/Y 的坐标。
+
+##### 14.2.2 input 事件结构
+
+evtest 工具的原理并不神秘，学习本章节后也可以尝试自己使用代码实现它的部分功能。列出可
+用事件时，它就是通过查看目录 `/dev/input/` 实现的。本示例中主机的 `/dev/input` 目录的内容如下图所示。
+
+![image-20241024093958498](.assets/image-20241024093958498.png)
+
+可看到 `/dev/input` 目录下，有各种 `event` 设备暴露到用户空间的访问接口文件，读取这些文件的内容可获取到设备上报的信息。
+
+在前面 GPIO 子系统中，`direction` 等设备文件直接使用字符串来记录具体的信息，所以使用 `cat` 命令输出文件的内容时，字符串的形式非常方便我们阅读。但是 `event` 文件包含的信息较多，使用字符串不方便其它程序处理，它**采用了纯粹的内核事件数据结构来记录内容，其它程序使用时应把读取到的内容按数据的结构进行格式化转换**，该数据结构定义如下所示：
+
+```c
+struct input_event 
+{
+	struct timeval time;
+	__u16 type;
+	__u16 code;
+	__s32 value;
+}
+```
+
+- `time` ：该变量用于记录事件产生的时间戳，既 `evtest` 输出的 `time` 值。
+
+- `type` ：输入设备的事件类型。系统常用的默认类型有 `EV_KEY`、`EV_REL` 和 `EV_ABS`，分别用于表示按键状态改变事件、相对坐标改变事件及绝对坐标改变事件，特别地，`EV_SYN` 用于分隔事件，无特别意义。如果选择鼠标（本章第一个图）`evtest` 输出的 `type` 类型为`EV_ABS`。相关的枚举值可以参考内核文件 `include/uapi/linux/input-event-codes.h`。
+- `code` ：事件代号，它以更精确的方式表示事件。例如在 `EV_KEY` 事件类型中，`code` 的值常用于表示键盘上具体的按键，其取值范围在0~127 之间，例如按键 Q 对应的是 KEY_Q，该枚举变量的值为16。如果选择鼠标，`evtest` 输出内容的 `code` 分别有 `ABS_X`/`ABS_Y`，表示上报的是X 或Y 坐标。
+
+- `value` ：事件的值。对于 `EV_KEY` 事件类型，当按键按下时，该值为1；按键松开时，该值为0。如果选择鼠标，中 `evtest` 输出的内容里，ABS_X 事件类型中的 `value` 值表示X 坐标，ABS_Y 类型中的 `value` 值表示Y 坐标。
+
+如果同样使用 `cat` 命令查看事件文件，当事件出现时，`cat` 把内容转化成字符串，会看到乱码，使用这样的方式可以简单地查看设备是否上报了事件。
+
+可以使用以下方式进行测试：
+
+```bash
+sudo cat /dev/input/event9
+```
+
+![image-20241024104401895](.assets/image-20241024104401895.png)
+
+与其它文件不同，通常 `cat` 命令读取文件内容后就会返回，而此处读取 `event` 文件时，命令会持续地等待输入。
+
+我们还可以使用 `hexdump` 命令来查看输出的命令：
+
+```bash
+hexdump /dev/input/event9
+```
+
+![image-20241024104232605](.assets/image-20241024104232605.png)
+
+二进制的数据可能会因为驱动的不一样而很难对其进行有效的分析。
+
+##### 14.2.3 input 事件设备名
+
+`/dev/input/event*` 的事件编号与设备的联系不是固定的，它通常按系统检测到设备的先后顺序安排 `event` 文件的编号，这对编写应用程序控制不太方便，我们可以通过 `/dev/input/by-id` 或 `/dev/input/by-path` 目录查看具体的硬件设备，如下图所示：
+
+![image-20241024104628476](.assets/image-20241024104628476.png)
+
+图中列出了 `by-path` 目录下的内容，该目录下的文件实际上都是链接，访问链接文件就是访问对应的事件设备，而且该文件名与硬件的关系是固定的，后面我们一般采用这样的方式。
+
+由于 `/dev` 下的设备都是通过 `/sys` 导出的，所以也可以通过 `/sys/class/input`目录查看，如下图所示：
+
+![image-20241024105006738](.assets/image-20241024105006738.png)
+
+`/sys/class/input` 下包含了各个以事件命名的目录，其对应目录下的 `device/name` 文件包含了事件对应的设备名。
+
+![image-20241024105234285](.assets/image-20241024105234285.png)
+
+`evtest` 工具列出的事件与设备名的关系，就是从这里读取的。
+
+#### 14.3 板卡按键检测实验
+
+##### 14.3.1 实验代码分析
+
+在输入事件检测的应用中，通常使用主线程直接循环读取 `/dev/input/event*` 设备文件获取事件的数据结构，然后通过消息队列通知其它子线程，从而响应输入操作。
+
+```c
+// path: base_linux/ev_test/ev_test.c
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/input.h>
+#include <linux/input-event-codes.h>
+
+const char default_path[] = "/dev/input/by-path/platform-fc880000.usb-usb-0:1.3:1.0-event-kbd";
+
+int main(int argc, char **argv)
+{
+    int fd;
+    struct input_event event;
+    char *path;
+
+    printf("This is a input device demo.\n");
+
+    // if not input parameters are given, the default
+    // event device is used.
+    if (argc > 1)
+        path = argv[1];
+    else
+        path = (char *)default_path;
+
+    fd = open(path, O_RDONLY);
+    if (fd < 0){
+        printf("Fail to open device: %s. \n "
+               "Please confirm the path or you have permission to do this.\n", path);
+        exit(1);
+    }
+
+    printf("Test device: %s.\nWatting for input...\n", path);
+
+    while (1) {
+        if (read(fd, &event, sizeof(event)) == sizeof(event))
+        {
+            if (event.type != EV_SYN){
+                printf("Event: time %ld.%ld, type %d, code %d, value %d\n",
+                       event.time.tv_sec, event.time.tv_usec,
+                       event.type,
+                       event.code,
+                       event.value);
+            }
+        }
+    }
+    close(fd);
+
+    return 0;
+}
+```
+
+- `fd = open(path, O_RDONLY);`  ：使用 `O_RDONLY` 模式打开事件设备文件，`O_RDONLY` 模式默认是阻塞型的，而且**事件设备文件支持阻塞操作**，也就是说，若后面使用 `read` 函数读取时，它会等待事件上报，一直等待至读取成功或失败才会返回。
+- 在 `while` 循环里通过 `read` 系统调用读取事件文件，读取到的内容存储在 `struct input_event` 类型的 `event` 变量中，`struct input_event` 类型就是前面介绍的内核事件数据结构。若成功读取，我们就可以通过该变量的结构体成员访问到事件的时间戳、类型、代号和值。
+- 输出读取到的 `event` 变量的各个成员值，在上报的事件中，通常会有很多类型为 `EV_SYN` 的事件，这种事件是用于分隔的，无特别意义，所以代码中不输出这类型事件的内容。
+
+值得思考的是，若没有上报事件，第 35 行的 `read` 读取事件设备文件操作会被阻塞，简单来说就是即使第 40 行的 `printf` 代码不注释掉，它也**不会在持续地在循环里输出**，而只有当出现了事件，触发 `read`退出，后面的 `printf` 函数才有机会被执行一次，然后重新 `read` 事件再次阻塞。**在这种阻塞的过程中，进程会休眠，释放它对 CPU 的占用。**
+
+假如我们使用的是 GPIO 子系统框架来编写按键驱动程序，在应用层的操作中，需要使用 `/sys/class/gpio/gpio*/direction` 文件配置为输入方向，然后使用循环读取 `/sys/class/gpio/gpio*/value`文件的值来获得按键的状态，但由于**对 `value` 文件的 `read` 读取操作不会阻塞，所以进程会不停地读取文件内容来判断按键值，占用 CPU 宝贵的运算资源。**
+
+由于 `read` 事件文件操作会阻塞，那么采用这种方式就无法同时检测两个输入设备了，这种时候
+可以通过 `select` 或 `poll` 等 IO 多路复用的操作达成目的。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/ev_test/Makefile
+TARGET = ev_test
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+DEPS = 
+BUILD_DIR = build
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -f $(TARGET)
+	rm -rf $(BUILD_DIR)
+```
+
+编译并运行文件：
+
+```bash
+make
+sudo ./ev_test
+```
+
+![image-20241024124834293](.assets/image-20241024124834293.png)
+
+### 15. 串口通讯
+
+通用异步收发器（Universal Asynchronous Receiver/Transmitter )，通常称作 UART，是一种串行、异步、全双工的通信协议，在嵌入式领域应用的非常广泛。
+
+LubanCat-RK3588 系列板子的通用 uart 设备有1 个（如 15.1 图所示），除此之外其他的 GPIO 也可以复用成 uart 设备，需要自行根据引脚复用图去配置，LubanCat-4 的 40pin 引脚最大可支持 5 个 uart 接口使用。
+
+LubanCat-RK 系列板卡的uart 控制器支持下列功能
+
+- 支持5、6、7、8 bits 数据位
+- 支持奇校验和偶校验，不支持 mark 校验和 space 校验
+-  支持接收 FIFO 和发送 FIFO，一般为 32 字节或者 64 字节
+-  支持最高 4M 波特率，实际支持波特率需要芯片时钟分频策略配合
+-  支持中断传输模式和 DMA 传输模式
+-  支持硬件自动流控，RTS + CTS
+
+本节的代码目录为：`base_linux/uart`
+
+#### 15.1 串口引脚关系
+
+|  串口   | 引脚 |    功能    |
+| :-----: | :--: | :--------: |
+| **TXD** |  8   | 发送信号线 |
+| **RXD** |  10  | 接受信号线 |
+
+对应板卡的 40Pin 接口：
+
+![image-20241024132050124](.assets/image-20241024132050124.png)
+
+- LubanCat-4 使用的是 uart0
+
+#### 15.2 使能串口接口
+
+串口在默认情况是关闭状态的，需要使能才能使用。
+
+LubanCat 4 的配置文件：
+
+|   板卡名称   |   配置文件名称    |                  说明                  |
+| :----------: | :---------------: | :------------------------------------: |
+| 当前使用板卡 |     nEnv.txt      | 系统会自动把板卡的配置文件链接到该文件 |
+|  LubanCat-4  | uEnvLubanCat4.txt |            适用于EBF410116             |
+
+可以通过打开 `/boot/uEnv/board.txt` （ `board` 是你所用的板子的名称），一般第一次启动已经初始化将板级 `uEnv.txt` 软连接到了 `/boot/uEnv/uEnv.txt`，可以直接修改该文件。
+
+查看是否启用了 uart 相关设备设备树插件。编辑文件，将带有 uart 的那一行的注释符号去掉如下图：
+
 
 
 
@@ -3894,7 +4140,6 @@ sudo ./gpio_system
 >
 > **使用板卡：** LubanCat 4 RK3588S
 >
-> **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
 
 
 
@@ -3904,7 +4149,6 @@ sudo ./gpio_system
 >
 > **使用板卡：** LubanCat 4 RK3588S
 >
-> **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
 
 ### 1. 获取内核源码
 
@@ -4051,6 +4295,36 @@ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- lubancat_linux_rk3588_defconfig
 ```shell
 make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j8
 ```
+
+### 8. Linux 设备树
+
+Linux3.x 以后的版本才引入了设备树，设备树用于描述一个硬件平台的板级细节。
+
+#### 8.1 设备树简介
+
+设备树 ( Device Tree ) 的作用就是描述一个硬件平台的硬件资源，一般描述那些不能动态探测到的设备，可以被动态探测到的设备是不需要描述。设备树可以被 bootloader(uboot) 传递到内核，内核可以从设备树中获取硬件信息。
+
+![image-20241024141142931](.assets/image-20241024141142931.png)
+
+设备树描述硬件资源时有两个特点：
+
+1. 以 “ 树状 ” 结构描述硬件资源。例如本地总线为树的 “ 主干 ” 在设备树里面称为 “ 根节点 ”，挂载到本地总线的 IIC 总线、SPI 总线、UART 总线为树的 “ 枝干 ” 在设备树里称为“ 根节点的子节点 ”，IIC 总线下的 IIC 设备不止一个，这些 “ 枝干 ” 又可以再分，除了根节点没有父节点外，其他节点都只有一个父节点。
+2. 设备树源文件可以像头文件 ( `.h` 文件 ) 那样，一个设备树文件引用另外一个设备树文件，这样可以实现 “ 代码 ” 的重用。例如多个硬件平台都使用 rk 系列处理器作为主控芯片，那么我们可以将 rk 系列芯片的硬件资源写到一个单独的设备树文件里面一般使用 `.dtsi`后缀，其他板级设备树文件直接使用 `# include xxx.dtsi` 引用即可。
+
+DTS、DTC 和 DTB 是文档中常见的几个缩写：
+
+- **DTS** ：是指 `.dts` 格式的文件，是一种 ASII 文本格式的设备树描述，也是我们要编写的设备树源码，一般一个`.dts` 文件对应一个硬件平台，对应 arm 架构，源文件位于Linux 源码的`/arch/arm/boot/dts` 目录下。
+- **DTC**  ：是指编译设备树源码的工具，一般情况下我们需要手动安装这个编译工具。
+
+- **DTB** ：是设备树源码编译生成的文件，类似于我们C 语言中 `.c` 文件编译生成 `.bin` 文件。
+
+#### 8.2 设备树框架
+
+设备树 ( Device Tree ) 由一系列被命名的结点 ( node ) 和属性 ( property ) 组成。
+
+
+
+
 
 
 
