@@ -4332,9 +4332,97 @@ DTS、DTC 和 DTB 是文档中常见的几个缩写：
 
 > **参考书籍：** [[野火]《嵌入式AI应用开发实战指南—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/Ai/zh/latest/index.html)
 >
+> **PC 端系统** ：VMWare Ubuntu 20.04
+>
 > **使用板卡：** LubanCat 4 RK3588S
 >
-> **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
+> **板卡系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
+
+
+
+随着 AI 技术在各个行业快速发展，在云端部署到实际应用场景中存在隐私保护、通讯延时、成本等问题，将 AI 技术和嵌入式系统结合，构建边缘计算成为当前技术热点之一。
+
+目前在嵌入式实现 AI 方式有：
+
+- 基于现有的嵌入式处理器对算法进行优化
+- 基于GPU 多处理器或者基于专门的运算加速单元等等
+
+这些方式有各自的优缺点，根据实际应用领域选择不同方案。
+
+rk3588S 处理器搭载了神经网络处理单元 ( NPU ) ，具备强大的算力，支持主流的深度学习框架，拥有功能丰富的开发工具和开发案例，同时硬件方面集成了GPU、VPU、RGA 等单元。
+
+### 1. LubanCat 4 资源概览
+
+#### 1.1 CPU
+
+LubanCat-4 使用瑞芯微 rk3588 系列处理器，该系列处理器的特点：
+
+- 8 核 64 位处理器，集成 4 核 Cortex-A76 和4 核 Cortex-A55 大小核架构，以及单独的NEON 协处理器
+- 大核支持最高 2.4Ghz，小核最高支持 1.8Ghz
+- 完整实现 ARM 架构 v8-A 指令集，ARM Neon Advanced SIMD（单指令、多数据）支持加速媒体和信号处理
+- 支持 Trustzone 技术等等
+
+#### 1.2 NPU（神经网络处理单元）
+
+rk3588 都内置独立的 NPU，高达 6TOPS，支持整数8、整数16 卷积运算，支持深度学习框架：TensorFlow、TF-lite、Pytorch、Caffe、ONNX 等等。
+
+NPU 是专门用于神经网络的处理单元，它旨在加速人工智能领域的神经网络算法，如机器视觉和自然语言处理。随着人工智能的应用范围正在扩大，目前提供各种领域的功能，包括面部跟踪、手势和身体跟踪、图像分类、视频监控、自动语音识别（ASR）以及高级驾驶员辅助系统（ADAS）等。
+
+使用 RKNPU，瑞芯微官方提供了 RKNN 组件, 包括 RKNPU2、RKNN Toolkit2 、RKLLM-Toolkit
+和 RKNPU 驱动等。
+
+**RKNPU2** 开发套件有一个运行库（librknnrt.so 等），提供 c/c++ 编程接口，用来部署推理RKNN模型，接口适用于 Linux 或者 Android 系统。
+
+**RKNN Toolkit2** 开发套件 ( Python 接口) 提供了在 PC，Rockchip NPU 平台上进行模型转换、量化功能、模型推理、性能和内存评估、量化精度分析、模型加密等功能。该套件中还有一个RKNNToolkit Lite2 ，它提供了一个 Python 编程接口，可以在板端部署 RKNN 模型。
+
+其中 **RKNN 模型 **是瑞芯微为了加速模型推理而基于自身 NPU 硬件架构定义的一套模型格式，使用该格式定义的模型在 Rockchip NPU 上可以获得更高的性能。
+
+**RKLLM-Toolkit**  是为用户提供在计算机上进行大语言模型（Large Language Model, LLM）的量化、转换的开发套件，支持将 Hugging Face 格式的大语言模型转换为 RKLLM 模型。
+
+**RKNPU 驱动** 提供了 NPU 硬件接口程序，板卡系统固件都已经适配好。
+
+### 2. 开发环境介绍
+
+#### 2.1 RKNN 开发环境
+
+![image-20241025101256575](.assets/image-20241025101256575.png)
+
+- 在 PC 端主要是进行模型训练和模型转换等, 可以选择 Windows 系统，或者 Windows 上的虚拟机 ubuntu，Docker 的 linux 系统，或者云服务器等等。
+
+- 在鲁班猫板卡上，系统使用 Ubuntu 或者 Debian，内核默认适配 rknn 驱动，其他 rknn 相关组件均包含。还有一些常用的相关软件和库安装，例如python，cmake，make，gcc，opencv 等等。
+
+#### 2.2 RKNN 开发流程
+
+```mermaid
+graph LR;
+	A[模型训练] --> B[模型转换] --> C[模型评估] --> D[模型部署]
+```
+
+- **模型训练** ：模型训练前需要根据具体项目问题， 选择模型， 数据采集， 然后使用适合的深度学习框架进行模型训练。
+
+    RKNN 模型算子的支持：[RKNN_Compiler_Support_Operator_List](https://github.com/airockchip/rknn-toolkit2/tree/master/doc)
+
+- **模型转换** ：将训练的深度学习模型会被转化为 RKNN 格式的模型。
+
+- **模型评估** ：将使用 RKNN-Toolkit2 工具量化和分析模型性能，包括精度、连板推理性能和内存占用等关键指标，根据模型的评估尝试修改和优化模型。
+
+    一些模型的优化可以参考：[RKNPU_User_Guide_RKNN_SDK](https://github.com/airockchip/rknn-toolkit2/tree/master/doc)
+
+- **板端部署** ：将转换的 RKNN 模型部署到板卡上, 具体可以查看 rknpu 运行库和 [RKNNToolkit-lite2](https://github.com/airockchip/rknn-toolkit2/tree/master/rknn-toolkit-lite2) 的使用。
+
+#### 2.3 相关软件安装
+
+以下软件和工具都是在PC端安装。
+
+##### 2.3.1 Anaconda 安装
+
+Anaconda 是可以便捷获取包且对包能够进行管理，同时对环境可以统一管理的发行版本。Anaconda 包含了 conda、Python 在内的众多流行的科学计算、数据分析包。
+
+Anaconda 安装可以从官网网页直接下载，根据系统选择不同的版本安装。这里选择的是适用于 ubuntu20.04 x86_64 的
+
+
+
+
 
 
 
@@ -4475,6 +4563,12 @@ const * char p;
 ![image-20241023184719771](.assets/image-20241023184719771.png)
 
 在弹出的菜单栏中选择 **`使用制表符缩进`**即可。
+
+
+
+### VMWare Ubuntu 虚拟机扩容
+
+> 参考 ：[vmware：ubuntu虚拟机如何扩容？](https://blog.csdn.net/qq_34160841/article/details/113058756)
 
 
 
