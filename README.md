@@ -4510,12 +4510,463 @@ struct termios {
 
 - `termios` ：结构体内部有 `_HAVE_STRUCT_TERMIOS_C_ISPEED` 和 `_HAVE_STRUCT_TERMIOS_C_OSPEED` 两个宏定义， 它们的宏值都为 1， 表示它支持 `c_ispeed` 和 `c_ospeed` 表示方式，部分标准中不支持使用这两个结构体成员表示波特率，而只使用 `c_cflag` 来表示。
 
-直接看结构体的定义比较抽象，下面以修改串口波特率、数据位、校验位和停止位的代码进行讲解。接下来几个小节的代码，是从野火配套代码仓库 `/linux_app/tty/c_full/sources/bsp_uart.c` 文件截取的，该文件以比较完善的方式封装了串口的配置。
+直接看结构体的定义比较抽象，下面以修改串口波特率、数据位、校验位和停止位的代码进行讲解。接下来几个小节的代码，是从野火配套代码仓库 `/linux_app/tty/c_full/sources/bsp_uart.c` 文件截取的，该文件以比较完善的方式封装了串口的配置，此处提取出了代码中的重点进行分析。
 
 1. 配置串口波特率
+
+    修改终端中串口波特率的实例代码如下：
+
+    ```c
+    struct termios opt;
+    // 获取串口参数
+    tcgetattr(fd, &opt);
+    // 设置串口输出波特率
+    cfsetospeed(&opt, B9600);
+    // 设置串口输入波特率
+    cfsetispeed(&opt, B9600);
+    // 更新配置
+    tcsetattr(fd, TCSANOW, &opt);
+    ```
+
+    代码中使用到了头文件 `termios.h` 的库函数 `tcgetattr`、`cfsetispeed`、`cfsetospeed` 和 `tcsetattr`。
+
+    其中 `tcgetattr` 和 `tcsetattr` 函数分别用于读取和设置串口的参数，原型如下：
+
+    ```c
+    #include <termios.h>
+    #include <unistd.h>
+    
+    int tcgetattr(int fd, struct termios *termios_p);
+    int tcsetattr(int fd, int optional_actions, const struct termios *termios_p);
+    ```
+
+    - `fd` ：指定串口设备文件的文件描述符。
+
+    - `termios_p` ：指向串口参数的结构体 `termios`，`tcgetattr` 读取到的参数会保存在该结构体中，而 `tcsetattr` 则根据该结构体配置设备参数。
+
+    - `optional_actions` ：仅 `tcsetattr` 函数有这个参数，它用于指示配置什么时候生效，它支持的配置参数如下：
+
+        - `TCSANOW` 表示立即生效。
+        - `TCSADRAIN` 表示待所有数据传输结束后配置生效。
+        - `TCSAFLUSH` 表示输入输出缓冲区为空时配置有效。
+
+        通常都使用选项TCSANOW，让写入的参数配置立马生效。
+
+    代码中的 `cfsetispeed` 和 `cfsetospeed` 函数分别用于设置 `termios` 结构体的输入和输出波特率，另外还有 `cfsetspeed` 函数可以同时设置输入和输出波特率参数为相同的值，原型如下：
+
+    ```c
+    int cfsetispeed(struct termios *termios_p, speed_t speed);
+    int cfsetospeed(struct termios *termios_p, speed_t speed);
+    int cfsetspeed(struct termios *termios_p, speed_t speed);
+    ```
+
+    使用这些函数要注意两点：
+
+    - `speed` 参数需要使用类似前面代码定义的宏值。
+    - 这三个函数只是修改了 `termios` 的 `opt` 变量的内容，并没有写入到设备文件，因此在修改完它的内容后，还需要调用 `tcsetattr` 函数，把 `opt` 变量中的配置写入到设备，使它生效。
+
+    这就是修改终端设备参数的过程，读取原配置、修改 `termios` 参数、写入 `termios` 参数。
+
 2. 配置串口停止位
+
+    `c_cflag` 中的标志位 `CSTOPB`，用于设置串口通信停止位的长度。若该值为 `0`，则停止位的长度为 1 位；若设置该位为 `1`，则停止位的长度为两位，具体实现如下所示：
+
+    ```c
+    // 在 bits/termios.h 文件中关于 CSTOPB 的定义
+    // 注意以 0 开头的数字在是 C 语言的 8 进制数字形式
+    #define CSTOPB 0000100
+    
+    // 设置停止位示例
+    // 定义termios 型变量opt
+    struct termios opt;
+    // 获取串口参数opt
+    tcgetattr(fd, &opt);
+    
+    /* 设置停止位*/
+    switch (stopbits)
+    {
+    	// 设置停止位为1 位
+    	case 1:
+    		opt.c_cflag &= ~CSTOPB;
+    		break;
+    	//设置停止位为2 位
+    	case 2:
+    		opt.c_cflag |= CSTOPB;
+    		break;
+    }
+    
+    // 更新配置
+    tcsetattr(fd, TCSANOW, &opt);
+    ```
+
+    修改配置的代码中使用了 `&=~` 、`|=` 这种位操作方法，主要是为了避免影响到变量中的其它位，因为在 `c_cflag` 的其它位还包含了校验位、数据位和波特率相关的配置，如果直接使用 `=` 赋值，那其它配置都会受到影响，而且操作不方便。
+
 3. 配置串口校验位
+
+    配置串口的校验位涉及到 `termios` 成员 `c_cflag` 的标志位 `PARENB`、`PARODD` 以及 `c_iflag` 的标志位 `INPCK`，其中 `PARENB` 和 `INPCK` 共同决定是否使能奇偶校验，而 `PARODD` 决定使用奇校验还是偶校验，配置的示例代码如下所示。
+
+    ```c
+    // bits/termios.h 的位定义
+    // 注意以 0 开头的数字在是 C 语言的 8 进制数字形式
+    /* c_cflag bit meaning */
+    #define PARENB 0000400
+    #define PARODD 0001000
+    /* c_iflag bits */
+    #define INPCK 0000020
+    
+    // 定义termios 型变量opt
+    struct termios opt;
+    
+    // 获取串口参数opt
+    tcgetattr(fd, &opt);
+    
+    switch (parity)
+    {
+    	case 'n':
+    	case 'N':
+    		options.c_cflag &= ~PARENB; /* 不使用奇偶校验*/
+    		options.c_iflag &= ~INPCK; /* 禁止输入奇偶检测*/
+    		break;
+    
+    	case 'o':
+    	case 'O':
+    		options.c_cflag |= PARENB; /* 启用奇偶效验*/
+    		options.c_iflag |= INPCK; /* 启用输入奇偶检测*/
+    		options.c_cflag |= PARODD ; /* 设置为奇效验*/
+    		break;
+    
+    	case 'e':
+    	case 'E':
+    		options.c_cflag |= PARENB; /* 启用奇偶效验*/
+    		options.c_iflag |= INPCK; /* 启用输入奇偶检测*/
+    		options.c_cflag &= ~PARODD; /* 设置为偶效验*/
+    		break;
+    }
+    
+    // 更新配置
+    tcsetattr(fd, TCSANOW, &opt);
+    ```
+
+    不校验时同时把 `PARENB` 和 `INPCK` 位清零，启用校验时把 `PARENB` 和 `INPCK` 同时置 1，而 `PARODD` 为1 时指定为奇校验，为0 时是偶校验。
+
 4. 配置串口数据位
+
+    串口的数据位是由 `c_cflag` 中的 `CSIZE` 配置的，由于串口支持5、6、7、8 位的配置，一共有四种，所以在 `c_cflag` 中使用了两个数据位进行配置，在配置前我们需要先对 `CSIZE` 数据位清零，然后再赋予5、6、7、8 的宏配置值，具体代码如下所示。
+
+    ```c
+    // bits/termios.h 的位定义
+    // 注意以 0 开头的数字在是 C 语言的 8 进制数字形式
+    #define CSIZE 0000060
+    #define CS5 0000000
+    #define CS6 0000020
+    #define CS7 0000040
+    #define CS8 0000060
+    
+    // 定义termios 型变量opt
+    struct termios opt;
+    // 获取串口参数opt
+    tcgetattr(fd, &opt);
+    
+    // 先清除CSIZE 数据位的内容
+    opt.c_cflag &= ~CSIZE;
+    
+    switch (databits) /* 设置数据位数 */
+    {
+    	case 5:
+    		opt.c_cflag |= CS5;
+    		break;
+    	case 6:
+    		opt.c_cflag |= CS6;
+    		break;
+    	case 7:
+    		opt.c_cflag |= CS7;
+    		break;
+    	case 8:
+    		opt.c_cflag |= CS8;
+    		break;
+    }
+    // 更新配置
+    tcsetattr(fd, TCSANOW, &opt);
+    ```
+
+#### 15.6 ioctl 系统调用
+
+而且按照传统的认知，文件操作大都是跟内容挂勾的，上一章节的 `inpu`t 事件设备文件记录了上报的事件信息，而 `tty` 设备的文件却不是记录串口终端的配置参数，因为对文件的 `write` 操作是对外发送数据，而 `read` 则是读取接收到的数据，也就是说，`tty*` 文件并没有记录串口终端的配置信息，那么 `tcgetattr`、`tcsetattr` 这两个函数究竟做了什么神仙操作？
+它们实际上都是对 `ioctl`  系统调用的封装。
+
+##### 15.6.1 ioctl 原型
+
+ioctl 系统调用的功能是向设备文件发送命令，控制一些特殊操作，它的函数原型如下：
+
+```c
+#include <sys/ioctl.h>
+int ioctl(int fd, unsigned long request, ...);
+```
+
+- `fd` ：与 `write`、`read` 类似，`fd` 文件句柄指定要操作哪个文件。
+- `reques` ：操作请求的编码，它是跟硬件设备驱动相关的，不同驱动设备支持不同的编码，驱动程序通常会使用头文件提供可用的编码给上层用户。
+- `⋯` ：这是一个没有定义类型的指针，它与 `printf` 函数定义中的 `⋯` 类似，不过`ioctl` 此处只能传一个参数。部分驱动程序执行操作请求时可能需要配置参数，或者操作完成时需要返回数据，都是通过此处传的指针进行访问的。
+
+##### 15.6.2 使用 ioctl 代替 tcgetattr 和 tcsetattr
+
+```c
+// path: base_linux/uart/uart_i/uart_i.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <termios.h>
+#include <string.h>
+
+const char default_path[] = "/dev/ttyS0";
+
+int main(int argc, char *argv[])
+{
+    int fd;
+    int res;
+    struct termios opt;
+    char *path;
+    char buf[1024] = "SprInec tty send test.\n";
+
+    // Get device path from command line argument
+    // or use default path /dev/ttyS0
+    if (argc > 1){
+        path = argv[1];
+    }
+    else {
+        path = (char *)default_path;
+    }
+
+    // Open device file
+    printf("This is tty/usart demo.\n");
+    fd = open(path, O_RDWR);
+    if (fd < 0){
+        printf("Fail to Open %s device\n",path);
+        return 0;
+    }
+
+    // Clearn uart description buffer
+    tcflush(fd, TCIOFLUSH);
+
+    // Get current uart parameters
+    // tcgetattr(fd, TCGETS, &opt);
+    res = ioctl(fd, TCGETS, &opt);
+    opt.c_ispeed = opt.c_cflag & (CBAUD | CBAUDEX);
+    opt.c_ospeed = opt.c_cflag & (CBAUD | CBAUDEX);
+
+    // Print define baud rate macro
+    printf("Macro B9600 = %#o\n", B9600);
+    printf("Macro B115200 = %#o\n", B115200);
+
+    // Print the value read from ictl TCGETS
+    printf("ioctl TCGETS, opt.c_ospeed = %#o\n", opt.c_ospeed);
+    printf("ioctl TCGETS, opt.c_ispeed = %#o\n", opt.c_ispeed);
+    printf("ioctl TCGETS, opt.c_cflag = %#x\n", opt.c_cflag);
+    speed_t change_speed = B9600;
+
+    if (opt.c_ospeed == B9600){
+        change_speed = B115200;
+    }
+
+    cfsetospeed(&opt, change_speed);
+    cfsetispeed(&opt, change_speed);
+
+    opt.c_cflag &= ~CSIZE;
+    opt.c_cflag |= CS8;
+
+    opt.c_cflag &= ~PARENB;
+    opt.c_iflag &= ~INPCK;
+
+    opt.c_cflag &= ~CSTOPB;
+
+    // Update uart parameters
+    // tcsetattr(fd, TCSETSW, &opt);
+    res = ioctl(fd, TCSETS, &opt);
+
+    // Read again uart parameters
+    res = ioctl(fd, TCGETS, &opt);
+    opt.c_ispeed = opt.c_cflag & (CBAUD | CBAUDEX);
+    opt.c_ospeed = opt.c_cflag & (CBAUD | CBAUDEX);
+    printf("ioctl TCGETS after TCSETS\n");
+
+    // Print the value read from ictl TCGETS
+    printf("ioctl TCGETS, opt.c_ospeed = %#o\n", opt.c_ospeed);
+    printf("ioctl TCGETS, opt.c_ispeed = %#o\n", opt.c_ispeed);
+    printf("ioctl TCGETS, opt.c_cflag = %#x\n", opt.c_cflag);
+
+    do {
+        write(fd, buf, strlen(buf));
+        res = read(fd, buf, sizeof(buf));
+        if (res > 0){
+            buf[res] = '\n';
+            buf[res+1] = '\0';
+            printf("Receive res = %d bytes data : %s\n", res, buf);
+        }
+    } while (res > 0);
+
+    printf("read error, res = %d\n", res);
+    close(fd);
+    return 0;
+}
+```
+
+Makefile 文件：
+
+```makefile
+TARGET = uart_i
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = 
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+编译运行：
+
+```bash
+make
+
+# 查看当前波特率
+stty -F /dev/ttyS0
+
+# 运行程序
+sudo ./uart_i
+
+# Ctrl + C 退出程序
+
+# 查看当前波特率
+stty -F /dev/ttyS0
+```
+
+![image-20241028175751747](.assets/image-20241028175751747.png)
+
+#### 15.7 查看 glibc 源码
+
+怎么知道这些的 `tcgetattr.c` 和 `tcsetattr.c` 是通过 `ioctl` 系统调用实现的，又是如何知道 `c_ispeed` 和 `c_ospeed` 需要通过 `c_cflag` 成员运算得出的？答案是查看源码，我们一直在强调 Linux 是开放的，就看我们如何挖掘这些宝藏了。
+
+既然它们是库函数，那我们就到 glibc 的源码中找找，`glibc` 的源码可以到其官网下载：http://www.gnu.org/software/libc/，下载到源码后，使用 `VS Code` 编辑器的搜索功能，就可以搜到相关的内容，如下图所示。
+
+这两个函数的定义位于`glibc` 源码的如下目录 `glibc/sysdeps/unix/sysv/linux/，`该目录中的 `tcgetattr.c` 和 `tcsetattr.c` 文件分别定义了这两个函数。
+
+```c
+int
+__tcgetattr (int fd, struct termios *termios_p)
+{
+  struct __kernel_termios k_termios;
+  int retval;
+
+  retval = INLINE_SYSCALL (ioctl, 3, fd, TCGETS, &k_termios);
+
+  if (__glibc_likely (retval == 0))
+    {
+      termios_p->c_iflag = k_termios.c_iflag;
+      termios_p->c_oflag = k_termios.c_oflag;
+      termios_p->c_cflag = k_termios.c_cflag;
+      termios_p->c_lflag = k_termios.c_lflag;
+      termios_p->c_line = k_termios.c_line;
+#if _HAVE_STRUCT_TERMIOS_C_ISPEED
+# if _HAVE_C_ISPEED
+      termios_p->c_ispeed = k_termios.c_ispeed;
+# else
+      termios_p->c_ispeed = k_termios.c_cflag & (CBAUD | CBAUDEX);
+# endif
+#endif
+#if _HAVE_STRUCT_TERMIOS_C_OSPEED
+# if _HAVE_C_OSPEED
+      termios_p->c_ospeed = k_termios.c_ospeed;
+# else
+      termios_p->c_ospeed = k_termios.c_cflag & (CBAUD | CBAUDEX);
+# endif
+#endif
+      if (sizeof (cc_t) == 1 || _POSIX_VDISABLE == 0
+	  || (unsigned char) _POSIX_VDISABLE == (unsigned char) -1)
+	memset (__mempcpy (&termios_p->c_cc[0], &k_termios.c_cc[0],
+			   __KERNEL_NCCS * sizeof (cc_t)),
+		_POSIX_VDISABLE, (NCCS - __KERNEL_NCCS) * sizeof (cc_t));
+      else
+	{
+	  memcpy (&termios_p->c_cc[0], &k_termios.c_cc[0],
+		  __KERNEL_NCCS * sizeof (cc_t));
+
+	  for (size_t cnt = __KERNEL_NCCS; cnt < NCCS; ++cnt)
+	    termios_p->c_cc[cnt] = _POSIX_VDISABLE;
+	}
+    }
+
+  return retval;
+}
+```
+
+### 16. I2C 通讯
+
+#### 16.1 I2C 通讯协议简介
+
+I2C 通讯协议 ( Inter － Integrated Circuit ) 是由 Phiilps 公司开发的，由于它**引脚少，硬件实现简单，可扩展性强，不需要 USART、CAN 等通讯协议的外部收发设备**，被广泛地使用在多个集成电路 ( IC ) 间的通讯。
+
+##### 16.1.1 I2C 物理层
+
+I2C 通讯设备之间的常用连接方式如下图：
+
+![image-20241028184452419](.assets/image-20241028184452419.png)
+
+它的物理层有如下特点：
+
+- 它是一个支持多设备的总线。“ 总线 ” 指多个设备共用的信号线。在一个 I2C 通讯总线中，可连接多个 I2C 通讯设备，**支持多个通讯主机及多个通讯从机**。
+- 一个 I2C 总线只使用两条总线线路，一条双向串行数据线 ( SDA ) ，一条串行时钟线( SCL )。数据线即用来表示数据，时钟线用于数据收发同步。
+- 每个连接到总线的设备都有一个独立的设备地址，主机可以利用这个地址进行不同设备之间的访问。其中地址是一个七位或十位的数字。
+- 总线通过上拉电阻接到电源。**当 I2C 设备空闲时，会输出高阻态**，而当所有设备都空闲，都输出高阻态时，由上拉电阻把总线拉成高电平。
+- 多个主机同时使用总线时，为了防止数据冲突，会利**用仲裁方式决定由哪个设备占用总线**。
+- 具有三种传输模式：标准模式传输速率为100kbit/s ，快速模式为400kbit/s ，高速模式下可达3.4Mbit/s，但目前大多I2C 设备尚不支持高速模式。
+- 连接到相同总线的 IC 数量受到总线的最大电容 400pF 限制。
+
+##### 16.1.2 I2C 协议层
+
+I2C 的协议定义了通讯的起始和停止信号、数据有效性、响应、仲裁、时钟同步和地址广播等环节。
+
+I2C 通讯过程的基本结构，它的通讯过程常有如下三种方式：
+
+![image-20241028184849994](.assets/image-20241028184849994.png)
+
+<img src=".assets/image-20241028184857734.png" alt="image-20241028184857734"  />
+
+![image-20241028185003897](.assets/image-20241028185003897.png)
+
+图例：
+
+![image-20241028185100438](.assets/image-20241028185100438.png)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
