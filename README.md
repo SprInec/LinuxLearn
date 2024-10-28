@@ -219,6 +219,8 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 > **参考书籍：** [[野火]《Linux基础与应用开发实战指南—基于LubanCat-RK系列板卡》](https://doc.embedfire.com/linux/rk356x/linux_base/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
+>
+> **系统** ：Debian 11 ( kernel : 5.10.198-rk3588 ) 
 
 ### 1. 配置网络
 
@@ -4111,6 +4113,36 @@ LubanCat-RK 系列板卡的uart 控制器支持下列功能
 
 串口在默认情况是关闭状态的，需要使能才能使用。
 
+##### 15.2.1 方法一
+
+适用于 LubanCat Debian 系统。
+
+进入工具配置：
+
+```bash
+sudo fire-config
+```
+
+移动键盘上下键选择 `外设` 后回车：
+
+![image-20241026155115930](.assets/image-20241026155115930.png)
+
+找到 `uart0-m2` ，单击空格键选中，然后按回车键
+
+![image-20241026155249908](.assets/image-20241026155249908.png)
+
+移动键盘左键到 <Finish> 后回车退出 fire-config 工具。
+
+![image-20241026155353201](.assets/image-20241026155353201.png)
+
+然后重启系统即可：
+
+```bash
+sudo reboot
+```
+
+##### 15.2.2 方法二
+
 LubanCat 4 的配置文件：
 
 |   板卡名称   |   配置文件名称    |                  说明                  |
@@ -4121,6 +4153,369 @@ LubanCat 4 的配置文件：
 可以通过打开 `/boot/uEnv/board.txt` （ `board` 是你所用的板子的名称），一般第一次启动已经初始化将板级 `uEnv.txt` 软连接到了 `/boot/uEnv/uEnv.txt`，可以直接修改该文件。
 
 查看是否启用了 uart 相关设备设备树插件。编辑文件，将带有 uart 的那一行的注释符号去掉如下图：
+
+![image-20241026155524254](.assets/image-20241026155524254.png)
+
+然后保存退出后重启系统即可：
+
+```bash
+:wq
+sudo reboot
+```
+
+#### 15.3 检查串口设备
+
+查看串口是否成功使能：
+
+```bash
+ls /dev/tty*
+```
+
+LubanCat4 为 `ttyS0`：
+
+![image-20241026155815368](.assets/image-20241026155815368.png)
+
+#### 15.4 串口通讯实验（Shell）
+
+对 `tty` 的设备文件直接读写就可以控制设备通过串口接收或发送数据，下面我们使用板卡配合Windows 下的串口调试助手或 Linux 下的 minicom 进行测试。
+
+##### 15.4.1 连接串口
+
+实验前需要使用串口线或USB 转串口线把它与板卡与电脑连接起来。
+
+-  板子  —  电脑
+-  TXD  —   RXD
+-  RXD  —   TXD
+-  GND —  GND
+
+##### 15.4.2 查询串口的通信参数
+
+```bash
+stty -F /dev/ttyS0
+```
+
+![image-20241026160410291](.assets/image-20241026160410291.png)
+
+##### 15.4.3 修改串口波特率
+
+```bash
+stty -F /dev/ttyS0 ispeed 115200 ospeed 115200
+```
+
+![image-20241026160911290](.assets/image-20241026160911290.png)
+
+##### 15.4.4 关闭回显
+
+默认串口是开启回显的可以使用以下命令关闭回显：
+
+```bash
+stty -F /dev/ttyS0 -echo
+```
+
+##### 15.4.5 与 Windows 主机通讯
+
+###### 15.4.5.1 串口通讯实验
+
+```bash
+echo hello! > /dev/ttyS0
+echo "I'm SprIne." > /dev/ttyS0
+```
+
+![image-20241026161637172](.assets/image-20241026161637172.png)
+
+![image-20241026161449442](.assets/image-20241026161449442.png)
+
+可以看到，往 `/dev/ttyS0` 设备文件写入的内容会直接通过串口线发送至 Winodws 的主机。
+
+读取设备文件则可接收 Winodws 主机发往板卡的内容，可以使用 `cat` 命令来读取：
+
+```bash
+cat /dev/ttyS0
+```
+
+![image-20241026161739343](.assets/image-20241026161739343.png)
+
+![image-20241026161757795](.assets/image-20241026161757795.png)
+
+###### 15.4.5.2 minicom 通讯
+
+安装 `minicom` 软件包：
+
+```bash
+sudo apt install minicom
+```
+
+设置串口：
+
+```bash
+sudo minicom -s
+```
+
+1. 通过鼠标上下键移动到下图所示选项按回车选择进入配置页面：
+
+<img src=".assets/image-20241026162119333.png" alt="image-20241026162119333" style="zoom:50%;" />
+
+2. 通过按各参数前面的字母跳转到对应参数进行配置，配置完成后单击回车跳转到底部 `Change which setting?` 选项再次回车保存并退出配置：
+
+<img src=".assets/image-20241026162330540.png" alt="image-20241026162330540" style="zoom:50%;" />
+
+3. 通过键盘上下键移动到下图选项后回车将刚刚的设置保存为默认设置：
+
+<img src=".assets/image-20241026162406252.png" alt="image-20241026162406252" style="zoom:50%;" />
+
+4. 移动到 `Exit` 选项后回车退出配置页面：
+
+<img src=".assets/image-20241026162437729.png" alt="image-20241026162437729" style="zoom:50%;" />
+
+5. 进入通讯页面：
+
+![image-20241026162819747](.assets/image-20241026162819747.png)
+
+若输入字母屏幕上没有显示，可通过 `Ctrl+A` + `Z` 进入菜单：
+
+![image-20241026163048910](.assets/image-20241026163048910.png)
+
+按下 `E`  可打开回显。然后测试通信即可：
+
+![image-20241026163612132](.assets/image-20241026163612132.png)
+
+![image-20241026163636478](.assets/image-20241026163636478.png)
+
+minicom 菜单命令：
+
+| 命令 | 功能                                                   |
+| :--: | ------------------------------------------------------ |
+|  s   | 发送文件                                               |
+|  p   | 设置通讯参数，包括一些预设的波特率，数据格式，数据位等 |
+|  l   | 就可以将 log 信息保存到一个文件中了, 方便查看          |
+|  t   | 设置终端参数，以及键位设置                             |
+|  w   | 超出一行的数据后自动换行                               |
+|  r   | 接收文件                                               |
+|  a   | 换行发送时会增加时间戳                                 |
+|  n   | 增加时间戳                                             |
+|  c   | 清除屏幕                                               |
+|  o   | 设置 minicom，相当于 `sudo minicom -s`                 |
+|  j   | 休眠状态                                               |
+|  x   | 退出的同时复位                                         |
+|  q   | 退出                                                   |
+
+也可以不用通过按 `ctrl + a` + `z` + `?` 的方式设置，而是直接使用 `ctrl + a` + `?`
+
+#### 15.5 串口通讯实验（系统调用）
+
+如果只是想通过串口终端设备收发数据，那么使用 `open`、`read`、`write` 等系统调用能轻易实现，操作的原理和前面的 `led`、`gpio`、`input` 设备并无区别，都是读写设备文件。但是 `led`、`gpio` 和 `input` 除了主设备文件，还有众多的属性文件配合用于设置设备的运行参数，如 `led` 的 `trigger` 文件，`gpio` 的 `direction` 文件，而终端设备却没有其它的属性文件，那么 `stty` 命令和 `minicom` 工具是如何配置终端设备参数的呢？
+
+##### 15.5.1 实验
+
+```c
+// path: base_linux/uart/uart_t/uart_t.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+
+const char default_path[] = "/dev/ttyS0";
+
+int main(int argc, char *argv[])
+{
+    int fd;
+    int res;
+    char *path;
+    char buf[1024] = "tty send test.\n";
+
+    // Get the device path from command line argument
+    // If no argument, use default path
+    if (argc > 1) {
+        path = argv[1];
+    } 
+    else {
+        path = default_path;
+    }
+
+    // Get the device file descriptor
+    printf("This is tty/usart demo.\n");
+    fd = open(path, O_RDWR);
+    if (fd < 0){
+        printf("Fail to Open %s device.\n", path);
+        return 0;
+    }
+
+    struct termios opt;
+    // Clear the UART buffer
+    tcflush(fd, TCIOFLUSH);
+    // Get the UART parameters opt
+    tcgetattr(fd, &opt);
+    // Set the baud rate to 9600
+    cfsetispeed(&opt, B9600);
+    cfsetospeed(&opt, B9600);
+
+    // Set the data bits to 8
+    opt.c_cflag &= ~CSIZE;
+    opt.c_cflag |= CS8;
+    // Set the parity bit to none
+    opt.c_cflag &= ~PARENB;
+    opt.c_cflag &= ~INPCK;
+    // Set the stop bit to 1
+    opt.c_cflag &= ~CSTOPB;
+    // Update the UART parameters
+    tcsetattr(fd, TCSANOW, &opt);
+    printf("Device %s is set to 9600bps, 8N1.\n", path);
+
+    do {
+        // Send the data to the device
+        write(fd, buf, strlen(buf));
+        // Receive the data from the device
+        res = read(fd, buf, 1024);
+        if (res > 0) {
+            // Add '\0' to the end of the string
+            buf[res] = '\n';
+            buf[res+1] = '\0';
+            printf("Receive res = %d bytes data: %s", res, buf);
+        }
+    } while (res >= 0);
+
+    printf("read error, res = %d", res);
+    close(fd);
+    return 0;
+}
+```
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/uart/uart_t/Makefile
+TARGET = uart_t
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = 
+
+$(TARGET): $(OBJS)
+        $(CC) -o $@ $^ $(CFLAGS)
+        @mkdir -p $(BUILD_DIR)
+        @mv *.o $(BUILD_DIR)
+        @cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+        $(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+        rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+编译运行：
+
+```bash
+make
+sudo ./uart_t
+```
+
+PC 端串口助手输入字符进行测试：
+
+![image-20241027190621656](.assets/image-20241027190621656.png)
+
+##### 15.5.2 代码分析
+
+- **SECTION 1** ：定义了默认使用的串口终端设备路径及其它一些变量。
+- **SECTION 2** ：根据 `main` 是否有输入参数确认使用哪个设备路径，并通过 `open` 的 `O_RDWR` 读写模式打开该设备。
+- **SECTION 3** ：定义了一个结构体 `termios` 用于获取、设置终端设备的参数，包括波特率、数据位数、校验位等。
+- **SECTION 4** ：在 `while` 循环中对终端设备使用 `read`  和 `write` 进行读写，从而控制串口收发数据。代码中在接收到的内容末尾加了 `’0’` 结束符，主要是为了方便使用字符串的方式处理内容。
+
+###### 15.5.2.1 termios 结构体
+
+SECTION 3，使用了 `termios` 结构体，它是在 POSIX 规范中定义的标准接口。Linux系统利用 `termios` 来设置串口的参数，它是在头文件 `<termios.h>` 包含的`<bits/termios.h>` 中定义的，该文件中还包含了各个结构体成员可使用的宏值，可使用 `locate` 命令查找该文件打开来阅读，关于 `termios` 结构体的定义摘录如下所示。
+
+```c
+// path: /usr/include/bits/termios.h
+struct termios {
+    tcflag_t c_iflag; /* input mode flags */
+	tcflag_t c_oflag; /* output mode flags */
+	tcflag_t c_cflag; /* control mode flags */
+	tcflag_t c_lflag; /* local mode flags */
+	cc_t c_line; /* line discipline */
+	cc_t c_cc[NCCS]; /* control characters */
+	speed_t c_ispeed; /* input speed */
+	speed_t c_ospeed; /* output speed */
+	#define _HAVE_STRUCT_TERMIOS_C_ISPEED 1
+	#define _HAVE_STRUCT_TERMIOS_C_OSPEED 1
+};
+```
+
+- `c_iflag` ：输入（ input ）模式标志，用于控制如何对串口输入的字符进行处理，常用的选项值见下表。
+
+    | 选项值 | 作用                     |
+    | :----: | :----------------------- |
+    | INPCK  | 启用输入奇偶检测         |
+    | IGNPAR | 忽略帧错误和奇偶检验错误 |
+    | IGNCR  | 忽略输入中的回车         |
+    |  IXON  | 开启 XON/XOFF 流控制     |
+    | IXOFF  | 关闭 XON/XOFF 流控制     |
+
+- `c_oflag` ：输出（ output ）模式标志，用于控制串口的输出模式，常用的选项值见下表。
+
+    | 选项值 | 作用                                   |
+    | :----: | :------------------------------------- |
+    | ONCLR  | 将输出中的换行符 NL 映射为回车-换行 CR |
+    | OCRNL  | 将输出的回车映射为换行符               |
+    | ONLRET | 不输出回车                             |
+    | OFILL  | 发送填充字符串                         |
+
+- `c_cflag` ：控制（ control ）模式标志，用于控制串口的基本参数，如数据位、停止位等，常用配置见下表，特别地，`c_cflag` 结构体成员还包含了波特率的参数。
+
+    | 选项值 | 作用                                           |
+    | :----: | ---------------------------------------------- |
+    | CSIZE  | 设置数据位长度，可以配置为CS5、CS6、CS7、CS8。 |
+    | CSTOPB | 如果设置 CSTOPB 标志，则使用两位停止位         |
+    | PARENB | 使能奇偶检验                                   |
+    | PARODD | 设置为奇校验                                   |
+
+- `c_lflag` ：本地（ local ）模式标志，主要用于控制驱动程序与用户的交互，在串口通信中，实际上用不到该成员变量。
+
+    | 选项值 | 作用                                                         |
+    | :----: | ------------------------------------------------------------ |
+    |  ISIG  | 如果设置 ISIG 标志，当接收到字符 INTR、QUIT 等字符，系统会产生相应的信号。 |
+    |  ECHO  | 是否需要回显字符。                                           |
+    | ICANON | 若设置了 ICANON 标志，则表示终端处于规范式输入状态，允许使用特殊字符 EOF、KILL 等。 |
+    | ECHONL | 若该标志位和 ICANON 标志位同时被设置，则回显换行符 NL。      |
+
+- `c_cc[NCCS]` : 该数组包含了终端的所有特殊字符，可以修改特殊字符对应的键值（ Ctrl+C 产生的 ^C，ASCII 码为 0x03 ），部分内容如下表。
+
+    | 数组的下标值 | 作用                                                         |
+    | :----------: | ------------------------------------------------------------ |
+    |    VINTR     | 中断字符，若接收到该字符时，会发送 `SIGINT` 信号。当设置了`c_lflag` 的 `ISIG` 标志位时，该字母不再作为输入传递。 |
+    |    VERASE    | 删除字符，删除上一个字符。                                   |
+    |     VIM      | 设置非标准模式读取的最小字节数                               |
+    |     VTIM     | 设置非标准模式读取时的延时值，单位为十分之一秒。             |
+
+- `c_ispeed` 和 `c_ospeed` ：记录串口的输入和输出波特率（ input speed 和 output speed ），部分可取值如下代码所示，宏定义中的数字以 `“0”` 开头，在 C 语言中这是表示 8 进制数字的方式。
+
+```c
+// 以 0 开头的数字在是 C 语言的 8 进制数字形式
+#define B1200 000011
+#define B1800 000012
+#define B2400 000013
+#define B4800 000014
+#define B9600 000015
+#define B19200 000016
+#define B38400 000017
+```
+
+- `termios` ：结构体内部有 `_HAVE_STRUCT_TERMIOS_C_ISPEED` 和 `_HAVE_STRUCT_TERMIOS_C_OSPEED` 两个宏定义， 它们的宏值都为 1， 表示它支持 `c_ispeed` 和 `c_ospeed` 表示方式，部分标准中不支持使用这两个结构体成员表示波特率，而只使用 `c_cflag` 来表示。
+
+直接看结构体的定义比较抽象，下面以修改串口波特率、数据位、校验位和停止位的代码进行讲解。接下来几个小节的代码，是从野火配套代码仓库 `/linux_app/tty/c_full/sources/bsp_uart.c` 文件截取的，该文件以比较完善的方式封装了串口的配置。
+
+1. 配置串口波特率
+2. 配置串口停止位
+3. 配置串口校验位
+4. 配置串口数据位
 
 
 
@@ -4670,3 +5065,56 @@ Makefile:23: *** missing separator.  Stop.
 
 这个错误通常是由于 Makefile 中的缩进问题导致的。Makefile 要求使用制表符（Tab）而不是空格来缩进命令。相关配置见 **OTHER - [VSCode 中将默认的空格缩进更改为 Tab 缩进](#VSCode 中将默认的空格缩进更改为 Tab 缩进)**
 
+
+
+### apt 安装报错 E: Unable to locate package xxxx
+
+- [x] 2024.10.26 15:24
+
+```bash
+cat@lubancat:/boot/uEnv$ sudo apt install neofetch
+Reading package lists... Done
+Building dependency tree... Done
+Reading state information... Done
+E: Unable to locate package neofetch
+```
+
+这个错误表明系统无法找到 `neofetch` 包。可能的原因有几个：
+
+**首先尝试使用 `sudo apt update` 更新软件包列表**，更新完后尝试 apt 是否可用，若无法正常更新或者更新完后仍不可用，再查看以下两条方法。
+
+1. **系统当前时间相较服务器端时间相差太大**，使用以下命令查看当前系统时间
+
+    ```bash
+    date
+    ```
+
+    如果返回的时间和现实时间相差过大，会导致 apt 安装报错，通过以下命令手动更新系统时间：
+
+    ```bash
+    sudo date -s "YYYY-MM-DD HH:MM:SS"
+    ```
+
+    然后再次尝试 apt 安装。
+
+    当系统时间更改了可以正常 apt 安装程序后，推荐安装 NTP 服务自动同步时间：
+
+    ```bash
+    sudo apt install ntp
+    ```
+
+2. **软件源缺失或者不匹配**，手动编辑 `/etc/apt/sources.list` 文件，确保源列表中包含以下行（Debian 系统，其他系统如 Ubuntu/CentOS去网络搜索需要的软件源）：
+
+    ```bash
+    deb http://deb.debian.org/debian/ bullseye main contrib non-free
+    deb http://deb.debian.org/debian/ bullseye-updates main contrib non-free
+    deb http://deb.debian.org/debian-security bullseye-security main contrib non-free
+    ```
+
+    使用以下命令查看并编辑 `/etc/apt/sources.list` 文件：
+
+    ```bash
+    sudo vim /etc/apt/sources.list
+    ```
+
+    若文件缺失以上三行源，复制粘贴到文件后面后保存退出，使用 apt 再次尝试安装。
