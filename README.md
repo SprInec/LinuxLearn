@@ -5845,6 +5845,350 @@ pwm11 -> pwmchip4
 
 #### 18.3 PWM 控制方式 (Shell)
 
+下面以 pwm10 为例：
+
+```bash
+# 将 pwm10 导出到用户空间
+echo 0 > /sys/class/pwm/pwmchip3/export
+
+# 设置 pwm 周期单位为 ns
+echo 1000000 > /sys/class/pwm/pwmchip3/pwm0/period
+
+# 设置占空比
+echo 500000 > /sys/class/pwm/pwmchip3/pwm0/duty_cycle
+
+# 设置 pwm 极性
+echo "normal" > /sys/class/pwm/pwmchip3/pwm0/polarity
+
+# 使能 pwm
+echo 1 > /sys/class/pwm/pwmchip3/pwm0/enable
+
+# 如果需要关闭 PWM 则将 pwm10 导出到用户空间
+echo 0 > /sys/class/pwm/pwmchip3/unexport
+```
+
+##### 18.4 PWM 控制方式 (系统调用)
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <string.h>
+
+static char pwm_path[75];
+
+static int pwm_config(const char *attr, const char *val)
+{
+    char file_path[100];
+    int len;
+    int fd;
+
+    sprintf(file_path, "%s/%s", pwm_path, attr);
+    if ((fd = open(file_path, O_WRONLY)) < 0) {
+        perror("open error");
+        return fd;
+    }
+
+    len = strlen(val);
+    if (len != write(fd, val, len)) {
+        perror("write error");
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+
+    return 0;
+}
+
+int main(int argc, char *argv[])
+{
+    if (4 != argc) {
+        fprintf(stderr, "Usage: $s <id> <period> <duty>\n", argv[0]);
+        exit(-1);
+    }
+
+    printf("PWM config: id<%s>, period<%%s>, duty<%%s>\n", argv[1], argv[2], argv[3]);
+
+    sprintf(pwm_path, "/sys/class/pwm/pwmchip%s/pwm0", argv[1]);
+    if (access(pwm_path, F_OK)){
+        char temp[100];
+        int fd;
+        sprintf(temp, "/sys/class/pwm/pwmchip%s/export", argv[1]);
+        if (0 > (fd = open(temp, O_WRONLY))) {
+            perror("open error");
+            exit(-1);
+        }
+
+        if (1 != write(fd, "0", 1)) {
+            perror("write error");
+            close(fd);
+            exit(-1);
+        }
+    }
+
+    if (pwm_config("period", argv[2]))
+        exit(-1);
+
+    if (pwm_config("duty_cycle", argv[3]))
+        exit(-1);
+
+    pwm_config("enable", "1");
+    getchar();
+
+    exit(0);
+}
+```
+
+- `perror` 用于输出一个描述最近发生错误的错误信息。它将 `errno` 的值转化为相应的错误信息，并将其输出到标准错误（stderr）。通常用在系统调用失败后，帮助开发者了解出错的原因。
+
+- `exit` 用于终止程序的执行，并返回一个状态码给操作系统。状态码通常是 0 表示成功，非 0 表示出错。
+
+    `exit` 与 `return` 的区别：
+
+    **`exit`**：
+
+    - 直接终止程序的执行。
+    - 可以在程序的任何地方调用。
+    - 不会执行任何在其后定义的代码，包括局部变量的析构。
+    - 可以返回到操作系统。
+
+    **`return`**：
+
+    - 用于从函数返回值，特别是在 `main` 函数中，它会结束程序并返回控制给操作系统。
+    - 只能在函数内部使用。
+    - 会执行函数的返回语句后续的代码（如局部变量的析构等）。
+
+Makefile 文件：
+
+```makefile
+TARGET = pwm_test
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = 
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+编译：
+
+```bash
+make
+```
+
+运行：
+
+```bash
+#./pwm_test pwmchip3 周期 占空比
+sudo ./pwm_test 3 1000000 500000
+```
+
+### 19. 摄像头
+
+### 20. 音频
+
+### 21. 屏幕与触摸
+
+### 22. 屏幕显示（framebuffer）
+
+#### 22.1 framebuffer 介绍
+
+FrameBuffer 中文译名为帧缓冲驱动，它是出现在 2.2.xx 内核中的一种驱动程序接口。主设备号为 29，次设备号递增。
+
+Linux 抽象出 FrameBuffer 这个设备来供用户态进程实现直接写屏。FrameBuffer 机制模仿显卡的功能，将显卡硬件结构抽象掉，可以通过 FrameBuffer 的读写直接对显存进行操作。用户可以将 FrameBuffer 看成是显示内存的一个映像，将其映射到进程地址空间之后，就可以直接进行读写操作，而写操作可以立即反应在屏幕上。这种操作是抽象的，统一的。
+
+用户不必关心物理显存的位置、换页机制等等具体细节，这些都是由 FrameBuffer 设备驱动来完成的。
+
+FrameBuffer 实际上就是嵌入式系统中专门为 GPU 所保留的一块连续的物理内存，LCD 通过专门的总线从framebuffer 读取数据，显示到屏幕上。
+
+FrameBuffer 本质上是一块显示缓存，往显示缓存中写入特定格式的数据就意味着向屏幕输出内容。所以说FrameBuffer 就是一块白板。
+
+屏幕位置从上到下，从左至右与内存地址是顺序的线性关系：
+
+![image-20241102204549396](.assets/image-20241102204549396.png)
+
+屏幕除了RGB888 的格式外，还具有其他的格式：
+
+```
+ARGB888:|AAAAAAAAA|RRRRRRRRR|GGGGGGGG|BBBBBBBB|
+RGB888: |         |RRRRRRRRR|GGGGGGGG|BBBBBBBB|
+RGB565: |RRRRRRGGG|GGGBBBBB|
+RGB555: | RRRRRGGG|GGGBBBBB|
+```
+
+#### 22.2 framebuffer 应用程序
+
+> **NOTE** :
+>
+> 如果使用的是带桌面版的镜像，在使用 framebuffer 前要注意先把图形界面关闭，不然会出现触摸后屏幕不断闪烁的情况。
+
+关闭用户图形界面：
+
+```bash
+sudo systemctl set-default multi-user.target
+sudo reboot
+```
+
+开启用户图形界面：
+
+```bash
+sudo systemctl set-default graphical.target
+sudo reboot
+```
+
+```c
+// path: base_linux/screen/framebuffer/framebuffer.c
+#include <stdio.h>
+#include <sys/types.h>  // open 需要的头文件
+#include <sys/stat.h>
+#include <fcntl.h>      // 打开文件需要的头文件
+#include <unistd.h>     // write read 系统调用头文件
+#include <sys/types.h>  
+#include <sys/mman.h>   // mmap 内存映射相关函数库
+#include <stdlib.h>     // malloc free 动态内存申请和释放函数头文件
+#include <string.h>
+#include <linux/fb.h>   // 包含 framebuffer 相关的头文件
+#include <sys/ioctl.h>  // ioctl 系统调用头文件
+
+// 32 位的颜色
+#define Black 0x00000000
+#define White 0xFFFFFFFF
+#define Red   0xFFFF0000
+#define Green 0xFF00FF00
+#define Blue  0xFF99FFFF
+
+int fd;
+unsigned int *fb_mem = NULL; // 设置显存的位数为 32 位
+struct fb_var_screeninfo var;
+struct fb_fix_screeninfo fix;
+
+int main(void)
+{
+    unsigned int i;
+    int ret;
+
+    // 打开 framebuffer 设备
+    fd = open("/dev/fb0", O_RDWR);
+    if (fd == -1) {
+        perror("Open LCD");
+        return -1;
+    }
+
+    // 获取屏幕的可变参数
+    ioctl(fd, FBIOGET_VSCREENINFO, &var);
+    // 获取屏幕的固定参数
+    ioctl(fd, FBIOGET_FSCREENINFO, &fix);
+
+
+    // 打印分辨率
+    printf("xres = %d, yres = %d\n", var.xres, var.yres);
+    // 打印总字节数和每行的长度
+    printf("line_length = %d, smem_len = %d\n", fix.line_length, fix.smem_len);
+    printf("xpanstep = %d, ypanstep = %d\n", fix.xpanstep, fix.ypanstep);
+
+    // 获取显存, 映射内存
+    fb_mem = (unsigned int *)mmap(NULL, var.xres * var.yres * 4, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+    
+    if (fb_mem == MAP_FAILED){
+        perror("Mmap LCD");
+        return -1;
+    }
+ 
+    // 清屏
+    memset(fb_mem, 0xff, var.xres * var.yres * 4);
+    sleep(1);
+
+    // 将屏幕填充为蓝色
+    for (i = 0; i < var.xres * var.yres; i++)
+        fb_mem[i] = Blue;
+    sleep(2);
+
+    // 清屏
+    memset(fb_mem, 0x00, var.xres * var.yres * 4);
+
+    // 映射后的地址, 通过 mmap 返回的值
+    munmap(fb_mem, var.xres * var.yres * 4);
+
+    close(fd); // 关闭 fb0 设备文件
+    return 0;
+}
+```
+
+编译：
+
+```bash
+gcc -o framebuffer framebuffer.c
+```
+
+运行：
+
+```bash
+./framebuffer
+```
+
+##### 代码分析
+
+操作屏幕一共需要四步就可以操作整个屏幕：
+
+1. 打开 framebuffer 设备
+
+    ```c
+        fd = open("/dev/fb0", O_RDWR);
+        if (fd == -1) {
+            perror("Open LCD");
+            return -1;
+        }
+    ```
+
+    这一步是打开 framebuffer 设备，这一步成功后会返回文件描述符 –fd，我们后面可以操作这个文件描述符操作该设备。
+
+2. 获取屏幕参数
+
+    ```c
+    	// 获取屏幕的可变参数
+        ioctl(fd, FBIOGET_VSCREENINFO, &var);
+        // 获取屏幕的固定参数
+        ioctl(fd, FBIOGET_FSCREENINFO, &fix);
+    
+    
+        // 打印分辨率
+        printf("xres = %d, yres = %d\n", var.xres, var.yres);
+        // 打印总字节数和每行的长度
+        printf("line_length = %d, smem_len = %d\n", fix.line_length, fix.smem_len);
+        printf("xpanstep = %d, ypanstep = %d\n", fix.xpanstep, fix.ypanstep);
+    ```
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
