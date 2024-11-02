@@ -4940,6 +4940,8 @@ I2C 通讯设备之间的常用连接方式如下图：
 
 I2C 的协议定义了通讯的起始和停止信号、数据有效性、响应、仲裁、时钟同步和地址广播等环节。
 
+###### 16.1.2.1 I2C 基本读写过程
+
 I2C 通讯过程的基本结构，它的通讯过程常有如下三种方式：
 
 ![image-20241028184849994](.assets/image-20241028184849994.png)
@@ -4952,21 +4954,896 @@ I2C 通讯过程的基本结构，它的通讯过程常有如下三种方式：
 
 ![image-20241028185100438](.assets/image-20241028185100438.png)
 
+这些图表示的是主机和从机通讯时，SDA 线的数据包序列。
+
+1. 其中S 表示由主机的 I2C 接口产生的传输起始信号 ( S )，这时连接到 I2C 总线上的所有从机都会接收到这个信号。
+2. 起始信号产生后， 所有从机就开始等待主机紧接下来广播的从机地址信号
+    ( SLAVE_ADDRESS )。在 I2C 总线上，每个设备的地址都是唯一的，当主机广播的地址与某个设备地址相同时，这个设备就被选中了，没被选中的设备将会忽略之后的数据信号。根据 I2C 协议，这个从机地址可以是 7 位或 10 位。
+3. 在地址位之后，是传输方向的选择位，该位为 0，表示后面的数据传输方向是由主机传输至从机，即主机向从机写数据。该位为 1，则相反，即主机由从机读数据。
+4. 从机接收到匹配的地址后，主机或从机会返回一个应答 ( ACK ) 或非应答 ( NACK ) 信号，只有接收到应答信号后，主机才能继续发送或接收数据。
+
+写数据方向：
+
+若配置的方向传输位为 “ 写数据 ” 方向，即第一幅图的情况，广播完地址，接收到应答信号后，主机开始正式向从机传输数据 ( DATA ) ，**数据包的大小为 8 位，主机每发送完一个字节数据，都要等待从机的应答信号 ( ACK )，重复这个过程，可以向从机传输 N 个数据，这个 N 没有大小限制**。当数据传输结束时，主机向从机发送一个停止传输信号( P )，表示不再传输数据。
+
+读数据方向：
+
+若配置的方向传输位为 “ 读数据 ” 方向，即第二幅图的情况，广播完地址，接收到应答信号后，从机开始向主机返回数据 ( DATA ) ，数据包大小也为 8 位，从机每发送完一个数据，都会等待主机的应答信号 ( ACK )，重复这个过程，可以返回 N 个数据，这个 N 也没有大小限制。当**主机希望停止接收数据时，就向从机返回一个非应答信号(NACK)，则从机自动停止数据传输。**
+
+复合格式：
+
+除了基本的读写，I2C 通讯更常用的是复合格式，即第三幅图的情况，该传输过程有**两次起始信号 ( S )** 。一般在第一次传输中，主机通过 SLAVE_ADDRESS 寻找到从设备后，发送一段 “ 数据 ”，这段数据通常用于表示从设备内部的寄存器或存储器地址 ( 注意区分它与 SLAVE_ADDRESS 的区别 )；在第二次的传输中，对该地址的内容进行读或写。也就是说，**第一次通讯是告诉从机读写地址，第二次则是读写的实际内容。**
+
+以上通讯流程中包含的起始、停止、数据有效性、地址和数据方向以及响应的说明按小节如下。
+
+###### 16.1.2.2 通讯的起始和停止信号
+
+前文中提到的起始 ( S ) 和停止 ( P ) 信号是两种特殊的状态，起始和停止信号一般由主机产生。如下图：
+
+![image-20241029131532436](.assets/image-20241029131532436.png)
+
+- 当 **SCL 线是高电平**时 **SDA 线从高电平向低电平切换**，这个情况表示通讯的起始。
+
+- 当 **SCL 是高电平**时 **SDA 线由低电平向高电平切换**，表示通讯的停止。
+
+###### 16.1.2.3 数据有效性
+
+I2C 使用 SDA 信号线来传输数据，使用 SCL 信号线进行数据同步，如下图。SDA 数据线在 SCL 的每个时钟周期传输一位数据。
+
+![image-20241029132326534](.assets/image-20241029132326534.png)
+
+- 传输时，SCL 为高电平的时候 SDA 表示的数据有效，即此时的 SDA 为高电平时表示数据 “ 1 ”，为低电平时表示数据 “ 0 ”。
+- 当SCL 为低电平时，SDA 的数据无效，一般在这个时候 SDA 进行电平切换，为下一次表示数据做好准备。
+
+每次数据传输都以字节为单位，每次传输的字节数不受限制。
+
+###### 16.1.2.4 地址及数据方向
+
+I2C 总线上的每个设备都有自己的独立地址，主机发起通讯时，通过 SDA 信号线发送设备地址 ( SLAVE_ADDRESS ) 来查找从机。I2C 协议规定设备地址可以是 7 位或 10 位，实际中 7 位的地址应用比较广泛。
+
+紧跟设备地址的一个数据位用来表示数据传输方向，它是数据方向位 ( R/ )，第 8 位或第 11 位。**数据方向位为 “ 1 ” 时表示主机由从机读数据，该位为 “ 0 ” 时表示主机向从机写数据。**
+
+<img src=".assets/image-20241029132704524.png" alt="image-20241029132704524" style="zoom: 33%;" />
+
+- 读数据方向时，主机会释放对 SDA 信号线的控制，由从机控制 SDA 信号线，主机接收信号。
+- 写数据方向时，SDA 由主机控制，从机接收信号。
+
+###### 16.1.2.5 响应
+
+I2C 的数据和地址传输都带响应。响应包括 “ 应答( ACK ) ” 和 “ 非应答 ( NACK ) ” 两种信号。作为数据接收端时，当设备 ( 无论主从机 ) 接收到 I2C 传输的一个字节数据或地址后：
+
+- 若希望对方**继续发送数据**，则需要向对方发送 “ **应答( ACK )** ” 信号，发送方会继续发送下一个数据；
+- 若接收端希望**结束数据传输**，则向对方发送 “ **非应答( NACK )** ” 信号，发送方接收到该信号后会产生一个停止信号，结束信号传输。如下图。
+
+![image-20241029132957449](.assets/image-20241029132957449.png)
+
+传输时主机产生时钟，在第 9 个时钟时，数据发送端会释放 SDA 的控制权，由数据接收端控制 SDA，若 SDA 为高电平，表示非应答信号 ( NACK )，低电平表示应答信号( ACK )。
+
+#### 16.2 LubanCat4 板卡 I2C 引脚
+
+LubanCat 4 板子有 5 个 I2C 外设，分别是 I2C-2, I2C-3, I2C-5, I2C-6, I2C-8。
+
+|   I2C    | 物理引脚 | 功能              |
+| :------: | :------: | ----------------- |
+| I2C2-SCL |    11    | I2C2 的时钟信号线 |
+| I2C2-SDA |    7     | I2C2 的数据线     |
+| I2C3-SCL |    31    | I2C3 的时钟信号线 |
+| I2C3-SDA |    37    | I2C3 的数据线     |
+| I2C5-SCL |    5     | I2C5 的时钟信号线 |
+| I2C5-SDA |    3     | I2C5 的数据线     |
+| I2C6-SCL |    28    | I2C6 的时钟信号线 |
+| I2C6-SDA |    27    | I2C6 的数据线     |
+| I2C8-SCL |    12    | I2C8 的时钟信号线 |
+| I2C8-SDA |    32    | I2C8 的数据线     |
+
+如下图：
+
+![image-20241029134006865](.assets/image-20241029134006865.png)
+
+#### 16.3 使能 IIC 通信接口
+
+IIC 接口在默认情况是关闭状态的，需要使能才能使用
+
+###### 方法一
+
+使用 `fire-config` 可视化配置工具：
+
+```bash
+sudo fire-config
+```
+
+###### 方法二
+
+配置 `/boot/uEnv/board.txt` 文件，启用 I2C 相关设备树插件。
+
+两个方法任选其一配置完后重启系统：
+
+```bash
+sync
+sudo reboot
+```
+
+#### 16.4 检查 IIC 设备
+
+```bash
+ls /dev/i2c-*
+```
+
+![image-20241029135653799](.assets/image-20241029135653799.png)
+
+#### 16.5 连接设备
+
+> 以 MPU6050 为例
+
+```tex
+  板子      ------   MPU6050
+ 3.3V(1)   ------     VCC
+ GND(6)    ------     GND
+ SCL(11)   ------     SCL
+ SDA(7)    ------     SDA
+```
+
+#### 16.6 IIC 第三方工具 - i2c-tools
+
+使用 i2c-tools 工具包提供了一些非常方便的工具来对系统的 I2C 总线进行调试，在板卡的终端中可直接执行以下命令进行安装：
+
+```bash
+sudo apt install i2c-tools wget gcc -y
+```
+
+安装后可使用的命令有 `i2cdetect`、`i2cdump`、`i2cset` 以及 `i2cget`, 用于扫描 I2C 总线上的设备、读写指定设备的寄存器等。
+
+##### 16.6.1 i2cdetect 其他命令
+
+- `i2cdetect -F i2cbus` ：查询 I2C 总线的功能，参数 `i2cbus` 表示 I2C 总线
+- `i2cdetect -V`：打印软件的版本
+- `i2cdetect -l`：检测当前系统有几组 I2C 总线
+
+###### 16.6.1.1 i2cget 命令
+
+`i2cget` ： 读取指定 IIC 设备的某个寄存器的值
+
+```bash
+i2cget [-f] [-y] i2cbus chip-address [data-address [mode]]
+```
+
+参数说明：
+
+- `f` ：强制访问设备。
+- `y` ：关闭交互模式，使用该参数时，不会提示警告信息。
+
+- `i2cbus` ：指定 i2c 总线的编号
+- `chip-address` ：i2c 设备地址
+- `data-address` ：设备的寄存器的地址
+- `mode` ：参考 `i2cdump` 命令。
+
+###### 16.6.1.2 i2cset 命令
+
+`i2cset` : 写入指定 IIC 设备的某个寄存器的值
+
+```
+i2cset [-f] [-y] [-m mask] [-r] i2cbus chip-address data-address [value] ⋯[mode]
+```
+
+参数说明：
+
+- `f` ：强制访问设备。
+- `y` ：关闭交互模式，使用该参数时，不会提示警告信息。
+- `m` ：
+- `r` ：写入后立即回读寄存器值，并将结果与写入的值进行比较。
+- `i2cbus` ：指定 i2c 总线的编号
+- `chip-address` ：i2c 设备地址
+- `data-address` ：设备的寄存器的地址
+- `value` ：要写入寄存器的值
+- `mode` ：参考 `i2cdump` 命令
+
+###### 16.6.1.3 i2cdump 命令
+
+`i2cdump` ：读取指定设备的全部寄存器的值。
+
+```
+i2cdump [-f] [-r first-last] [-y] i2cbus address [mode [bank [bankreg]]]
+```
+
+参数说明：
+
+- `r` ：指定寄存器范围，只扫描从first 到last 区域；
+- `f` ：强制访问设备。
+- `y` ：关闭人机交互模式；
+- `i2cbus` ：指定i2c 总线的编号
+- `address` ：指定设备的地址
+- `mode`：指定读取的大小，可以是 b, w, s 或i，分别对应了字节，字，SMBus 块, I2C 块
+
+`i2cdump -V` ：打印软件的版本号
+
+查看挂载在 `i2c-2`  上的器件情况，输出内容如下所示：
+
+```bash
+sudo -i
+i2cdetect -a 2
+```
+
+![image-20241029142708097](.assets/image-20241029142708097.png)
+
+其中 `69` 是为 MPU6050 的设备地址，常用的命令还有以下几个：
+
+检测当前系统有几组 i2c 总线：
+
+```bash
+i2cdetect -l
+```
+
+查看 i2c-2 接口上的设备：
+
+```bash
+i2cdetect -a 2
+```
+
+读取指定设备的全部寄存器的值：
+
+```bash
+i2cdump -f -y 3 0x68
+```
+
+读取指定 IIC 设备的某个寄存器的值，如下读取地址为 `0x68` 器件中的 `0x01` 寄存器值：
+
+```
+i2cget -f -y 3 0x68 0x01
+```
+
+写入指定 IIC 设备的某个寄存器的值，如下设置地址为 `0x68` 器件中的 `0x01` 寄存器值为 `0x6f`：
+
+```
+i2cset -f -y 3 0x68 0x01 0x6f
+```
+
+#### 16.7 读取陀螺仪传感器（MPU6050）数据实验
+
+##### 16.7.1 ioctl 函数
+
+在编写应用程序时需要使用 `ioctl` 函数设置 i2c 相关配置，其函数原型如下：
+
+```c
+#include <sys/ioctl.h>
+
+int ioctl(int fd, unsigned long request, ...);
+```
+
+其中对于终端 `request` 的值常用的有以下几种：
+
+|       值        | 功能                                      |
+| :-------------: | ----------------------------------------- |
+|   I2C_RETRIES   | 设置收不到 ACK 时的重试次数，默认为1      |
+|   I2C_TIMEOUT   | 设置超时时限的 jiffies                    |
+|    I2C_SLAVE    | 设置从机地址                              |
+| I2C_SLAVE_FORCE | 强制设置从机地址                          |
+|   I2C_TENBIT    | 选择地址长度 0 为 7 位地址，非 0 为 10 位 |
+
+##### 16.7.2 编写应用程序
+
+根据 ioctl 相关参数即可编写与 i2c 相关的接口函数，读取 mpu6050 原始数据程序如下：
+
+```c
+// path: bash_linux/i2c/i2c_mpu6050/i2c_mpu6050.h
+#ifndef   __I2C_MPU6050_H__
+#define   __I2C_MPU6050_H__
+
+#include <stdint.h>
+
+/* Register Map */
+#define SMPLRT_DIV 0x19
+#define PWR_MGMT_1 0x6B
+#define CONFIG 0x1A
+#define ACCEL_CONFIG 0x1C
+
+#define ACCEL_XOUT_H 0x3B
+#define ACCEL_XOUT_L 0x3C
+#define ACCEL_YOUT_H 0x3D
+#define ACCEL_YOUT_L 0x3E
+#define ACCEL_ZOUT_H 0x3F
+#define ACCEL_ZOUT_L 0x40
+#define GYRO_XOUT_H 0x43
+#define GYRO_XOUT_L 0x44
+#define GYRO_YOUT_H 0x45
+#define GYRO_YOUT_L 0x46
+#define GYRO_ZOUT_H 0x47
+#define GYRO_ZOUT_L 0x48
+
+// Slave Address MPU6050
+#define Address 0x69
+
+// Function Prototypes
+int mpu6050_init(int fd, uint8_t addr);
+int i2c_write(int fd, uint8_t addr, uint8_t reg, uint8_t val);
+int i2c_read(int fd, uint8_t addr, uint8_t reg, uint8_t *val);
+short GetData(int fd, uint8_t addr, unsigned char REG_Adddress);
+
+#endif // __I2C_MPU6050_H__
+```
+
+```c
+// path: bash_linux/i2c/i2c_mpu6050/i2c_mpu6050.c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <sys/ioctl.h>
+#include "i2c_mpu6050.h"
+
+int main(int argc, char *argv[])
+{
+    int fd;
+    fd = I2C_SLAVE;
+
+    if (argc < 2) {
+        printf("Wrong use!!!\n");
+        printf("Usage: %s <dev>\n", argv[0]);
+        return -1;
+    }
+
+    // Open file and enable read and write operations
+    fd = open(argv[1], O_RDWR);
+    if (fd < 0){
+        printf("Error opening file: %s\n", argv[1]);
+        exit(1);
+    }
+
+    mpu6050_init(fd, Address);
+
+    while(1)
+    {
+        usleep(1000 * 10);
+        printf("ACCE_X: %6d\n", GetData(fd, Address, ACCEL_XOUT_H));
+        usleep(1000 * 10);
+        printf("ACCE_Y: %6d\n", GetData(fd, Address, ACCEL_YOUT_H));
+        usleep(1000 * 10);
+        printf("ACCE_Z: %6d\n", GetData(fd, Address, ACCEL_ZOUT_H));
+        usleep(1000 * 10);
+        printf("GTRO_X: %6d\n", GetData(fd, Address, GYRO_XOUT_H));
+        usleep(1000 * 10);
+        printf("GTRO_Y: %6d\n", GetData(fd, Address, GYRO_YOUT_H));
+        usleep(1000 * 10);
+        printf("GTRO_Z: %6d\n\n", GetData(fd, Address, GYRO_ZOUT_H));
+        sleep(1);
+    }
+
+    close(fd);
+    return 0;
+}
+
+/**
+ * @brief MPU6050 Init
+ *
+ * @param fd device file descriptor
+ * @param addr address of the device
+ * @return int 
+ */
+int mpu6050_init(int fd, uint8_t addr)
+{
+    i2c_write(fd, addr, PWR_MGMT_1, 0x00);
+    i2c_write(fd, addr, SMPLRT_DIV, 0x07);
+    i2c_write(fd, addr, CONFIG, 0x06);
+    i2c_write(fd, addr, ACCEL_CONFIG, 0x01);
+    return 0;
+}
+
+/**
+ * @brief I2C write function
+ * 
+ * @param fd device file descriptor
+ * @param addr address of the device
+ * @param reg register address
+ * @param val value to be written
+ * @return int returns 0 if successful, -1 otherwise
+ */
+int i2c_write(int fd, uint8_t addr, uint8_t reg, uint8_t val)
+{
+    int retries;
+    uint8_t data[2];
+
+    data[0] = reg;
+    data[1] = val;
+
+    // Set address length: 0 express 7 bit address
+    ioctl (fd, I2C_TENBIT, 0);
+
+    // Set slave address
+    if (ioctl(fd, I2C_SLAVE, addr) < 0)
+    {
+        printf("Error setting slave address\n");
+        close(fd);
+        return -1;
+    }
 
 
+    ioctl(fd, I2C_RETRIES, 5);
 
+    if (write(fd, data, 2) == 2){
+        return 0;
+    }
+    else{
+        return -1;
+    }
+}
 
+/**
+ * @brief I2C read function
+ *
+ * @param fd device file descriptor
+ * @param addr address of the device
+ * @param reg register address
+ * @param val values
+ * @return int returns 0 if successful, -1 otherwise
+ */
+int i2c_read(int fd, uint8_t addr, uint8_t reg, uint8_t *val)
+{
+    int retries;
 
+    // Set address length: 0 express 7 bit address
+    ioctl(fd, I2C_TENBIT, 0);
 
+    // Set slave address
+    if (ioctl(fd, I2C_SLAVE, addr) < 0)
+    {
+        printf("Error setting slave address\n");
+        close(fd);
+        return -1;
+    }
 
+    ioctl(fd, I2C_RETRIES, 5);
 
+    if (write(fd, &reg, 1) == 1){
+        if (read(fd, val, 1) == 1){
+            return 0;
+        }
+    }
+    else{
+        return -1;
+    }
+}
 
+/**
+ * @brief Get the Data object
+ *
+ * @param fd device file descriptor
+ * @param addr address of the device
+ * @param REG_Address 
+ * @return short 
+ */
+short GetData(int fd, uint8_t addr, unsigned char REG_Address)
+{
+    char H, L;
 
+    i2c_read(fd, addr, REG_Address, &H);
+    usleep(1000);
+    i2c_read(fd, addr, REG_Address + 1, &L);
+    return (H << 8) + L;
+}
+```
 
+Makefile 文件：
 
+```makefile
+TARGET = i2c_mpu6050
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = $(TARGET).h
 
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
 
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+编译并运行：
+
+```bash
+make
+sudo ./i2c_mpu6050 /dev/i2c-2
+```
+
+![image-20241029162730906](.assets/image-20241029162730906.png)
+
+### 17. SPI 通信
+
+#### 17.1 SPI 通讯协议简介
+
+SPI 协议是由摩托罗拉公司提出的通讯协议 ( Serial Peripheral Interface )，即串行外围设备接口，是一种高速全双工的通信总线。它被广泛地使用在 ADC、LCD 等设备与 MCU 间，要求通讯速率较高的场合。
+
+##### 17.1.1 SPI 物理层
+
+![image-20241030142812463](.assets/image-20241030142812463.png)
+
+SPI 通讯使用 3 条总线及片选线，3 条总线分别为 SCK、MOSI、MISO，片选线为，它们的作用介绍如下：
+
+- **( Slave Select )** ：从设备选择信号线，常称为片选信号线，也称为 NSS、CS，以下用 NSS 表示。当有多个 SPI 从设备与 SPI 主机相连时，设备的其它信号线 SCK、MOSI 及 MISO 同时并联到相同的 SPI 总线上，即无论有多少个从设备，都共同只使用这3 条总线；而每个从设备都有独立的这一条 NSS 信号线，本信号线独占主机的一个引脚，即有多少个从设备，就有多少条片选信号线。I2C 协议中通过设备地址来寻址、选中总线上的某个设备并与其进行通讯；而 SPI 协议中没有设备地址，它**使用 NSS 信号线来寻址**，当主机要选择从设备时，把该从设备的NSS 信号线设置为低电平，该从设备即被选中，即片选有效，接着主机开始与被选中的从设备进行 SPI 通讯。所以 SPI 通讯**以 NSS 线置低电平为开始信号，以 NSS 线被拉高作为结束信号。**
+- **SCK (Serial Clock)** ：时钟信号线，用于通讯数据同步。它由通讯主机产生，决定了通讯的速率，不同的设备支持的最高时钟频率不一样，如 RT1052 的SPI 时钟频率最大为 $f_{pclk}/2$，两个设备之间通讯时，通讯速率受限于低速设备。
+- **MOSI (Master Output，Slave Input)** ：主设备输出/从设备输入引脚。主机的数据从这条信号线输出，从机由这条信号线读入主机发送的数据，即这条线上数据的方向为**主机到从机**。
+- **MISO(Master Input,，Slave Output)** ：主设备输入/从设备输出引脚。主机从这条信号线读入数据，从机的数据由这条信号线输出到主机，即在这条线上数据的方向为**从机到主机**。
+
+##### 17.1.2 SPI 协议层
+
+与 I2C 的类似，SPI 协议定义了通讯的起始和停止信号、数据有效性、时钟同步等环节。
+
+###### 17.1.2.1 SPI 基本通讯过程
+
+![image-20241030143355861](.assets/image-20241030143355861.png)
+
+这是一个主机的通讯时序。NSS、SCK、MOSI 信号都由主机控制产生，而 MISO 的信号由从机产生，主机通过该信号线读取从机的数据。MOSI 与 MISO 的信号只在 NSS 为低电平的时候才有效，在 SCK 的每个时钟周期 MOSI 和 MISO 传输一位数据。
+
+###### 17.1.2.2 通讯的起始和停止信号
+
+在上图中的标号处，NSS 信号线由高变低，是 SPI 通讯的起始信号。NSS 是每个从机各自独占的信号线，当从机检在自己的 NSS 线检测到起始信号后，就知道自己被主机选中了，开始准备与主机通讯。在图中的标号处，NSS 信号由低变高，是 SPI 通讯的停止信号，表示本次通讯结束，从机的选中状态被取消。
+
+###### 17.1.2.3 数据有效性
+
+SPI 使用 MOSI 及 MISO 信号线来传输数据，使用 SCK 信号线进行数据同步。MOSI 及 MISO 数据线在 SCK 的每个时钟周期传输一位数据，且数据输入输出是同时进行的。数据传输时，MSB 先行或 LSB 先行并没有作硬性规定，但要保证两个 SPI 通讯设备之间使用同样的协定，一般都会采用上图中的 MSB 先行模式。
+
+观察图中的标号处，MOSI 及 MISO 的数据在 SCK 的上升沿期间变化输出，在SCK 的下降沿时被采样。即在 SCK 的下降沿时刻，MOSI 及 MISO 的数据有效，高电平时表示数据 “1”，为低电平时表示数据 “0”。在其它时刻，数据无效，MOSI 及 MISO 为下一次表示数据做准备。SPI 每次数据传输可以 8 位或 16 位为单位，每次传输的单位数不受限制。
+
+###### 17.1.2.4 CPOL/CPHA 及通讯模式
+
+上面讲述的图中的时序只是 SPI 中的其中一种通讯模式，SPI 一共有四种通讯模式，它们的主要区别是总线空闲时 SCK 的时钟状态以及数据采样时刻。为方便说明，在此引入 “ 时钟极性 CPOL ” 和 “ 时钟相位 CPHA ” 的概念。
+
+- 时钟极性 CPOL 是指 SPI 通讯设备处于空闲状态时，SCK 信号线的电平信号 ( 即 SPI 通讯开始前、NSS 线为高电平时 SCK 的状态)。CPOL=0 时，SCK 在空闲状态时为低电平，CPOL=1 时，则相反。
+- 时钟相位 CPHA 是指数据的采样的时刻，当 CPHA=0 时，MOSI 或 MISO 数据线上的信号将会在 SCK 时钟线的 “ **奇数边沿** ” 被采样。当 CPHA=1 时，数据线在 SCK 的 “ **偶数边沿** ” 采样。
+
+如下图：
+
+![image-20241030144217887](.assets/image-20241030144217887.png)
+
+我们来分析这个 CPHA=0 的时序图。首先，根据 SCK 在空闲状态时的电平，分为两种情况。SCK 信号线在空闲状态为低电平时，CPOL=0；空闲状态为高电平时，CPOL=1。
+
+无论 CPOL=0 还是 =1，因为我们配置的时钟相位 CPHA=0，在图中可以看到，采样时刻都是在 SCK 的奇数边沿。注意当 CPOL=0 的时候，时钟的奇数边沿是上升沿，而 CPOL=1 的时候，时钟的奇数边沿是下降沿。所以 SPI 的采样时刻不是由上升/下降沿决定的。MOSI 和 MISO 数据线的有效信号在 SCK 的奇数边沿保持不变，数据信号将在 SCK 奇数边沿时被采样，在非采样时刻，MOSI 和MISO 的有效信号才发生切换。
+
+类似地，当 CPHA=1 时，不受 CPOL 的影响，数据信号在 SCK 的偶数边沿被采样。
+
+如下图：
+
+![image-20241030145821701](.assets/image-20241030145821701.png)
+
+由 CPOL 及 CPHA 的不同状态，SPI 分成了四种模式，见下表，主机与从机需要工作在相同的模式下才可以正常通讯，实际中采用较多的是 “ 模式 0 ” 与 “ 模式 3 ”。
+
+| SPI 模式 | CPOL | CPHA | 空闲时 SCK 时钟 | 采样时刻 |
+| :------: | :--: | :--: | :-------------: | :------: |
+|    0     |  0   |  0   |     低电平      | 奇数边沿 |
+|    1     |  0   |  1   |     低电平      | 偶数边沿 |
+|    2     |  1   |  0   |     高电平      | 奇数边沿 |
+|    3     |  1   |  1   |     高电平      | 偶数边沿 |
+
+##### 17.1.3 扩展SPI 协议（Single/Dual/Quad/Octal SPI）
+
+以上介绍的是经典 SPI 协议的内容，这种也被称为标准 SPI 协议（ Standard SPI ）或单线SPI 协议（ Single SPI ），其中的单线是指该 SPI 协议中使用单根数据线 MOSI 进行发送数据，单根数据线 MISO 进行接收数据。
+
+为了适应更高速率的通讯需求，半导体厂商扩展 SPI 协议，主要发展出了Dual/Quad/Octal SPI 协议，加上标准 SPI 协议（ Single SPI ），这四种协议的**主要区别是数据线的数量及通讯方式**，具体见下表。
+
+|         协议          |  数据线数量及功能   | 通讯方式 |
+| :-------------------: | :-----------------: | :------: |
+| Single SPI（标准SPI） | 1 根发送，1 根接收  |  全双工  |
+|  Dual SPI（双线SPI）  | 收发共用 2 根数据线 |  半双工  |
+|  Quad SPI（四线SPI）  | 收发共用 4 根数据线 |  半双工  |
+| Octal SPI（八线SPI）  | 收发共用 8 根数据线 |  半双工  |
+
+扩展的三种 SPI 协议都是半双工的通讯方式，也就是说它们的数据线是分时进行收发数据的。例如，标准 SPI（Single SPI）与双线 SPI（Dual SPI）都是两根数据线，但标准 SPI（Single SPI）的其中一根数据线只用来发送，另一根数据线只用来接收，即全双工；而双线 SPI（Dual SPI）的两根线都具有收发功能，但在同一时刻只能是发送或者是接收，即半双工，四线 SPI（Quad SPI）和八线 SPI（Octal SPI）与双线 SPI（Dual SPI）类似，只是数据线量的区别。
+
+###### 17.1.3.1 SDR 和 DDR 模式
+
+扩展的 SPI 协议还增加了 SDR 模式（ 单倍速率Single Data Rate ）和 DDR 模式（ 双倍速率DoubleData Rate）。例如在标准 SPI 协议的 SDR 模式下，只在 SCK 的单边沿进行数据传输，即一个 SCK时钟只传输一位数据；而在它的 DDR 模式下，会在 SCK 的上升沿和下降沿都进行数据传输，即一个 SCK 时钟能传输两位数据，传输速率提高一倍。
+
+#### 17.2 SPI 相关数据结构与 ioctl 函数
+
+编写应用程序需要使用到 `spi_ioc_transfer` 结构体，如下所示：
+
+```c
+struct spi_ioc_transfer {
+	__u64 tx_buf; //发送数据缓存
+	__u64 rx_buf; //接收数据缓存
+    __u32 len; //数据长度
+	__u32 speed_hz; //通讯速率
+
+	__u16 delay_usecs; //两个spi_ioc_transfer 之间的延时，微秒
+	__u8 bits_per_word; //数据长度
+	__u8 cs_change; //取消选中片选
+	__u8 tx_nbits; //单次数据宽度(多数据线模式)
+	__u8 rx_nbits; //单次数据宽度(多数据线模式)
+	__u16 pad;
+};
+```
+
+在编写应用程序时还需要使用 `ioctl` 函数设置 `spi` 相关配置，其函数原型如下:
+
+```c
+#include <sys/ioctl.h>
+
+int ioctl(int fd, unsigned long request, ...);
+```
+
+其中对于终端 request 的值常用的有以下几种：
+
+|        request 值        | 功能                                                         |
+| :----------------------: | ------------------------------------------------------------ |
+|    SPI_IOC_RD_MODE32     | 设置读取 SPI 模式(对应上文的 SPI 的四种模式的表格，SPI_MODE_x) |
+|    SPI_IOC_WR_MODE32     | 设置写入 SPI 模式(对应上文的 SPI 的四种模式的表格，SPI_MODE_x) |
+|   SPI_IOC_RD_LSB_FIRST   | 设置 SPI 读取数据模式 ( LSB 先行返回 1 )                     |
+|   SPI_IOC_WR_LSB_FIRST   | 设置 SPI 写入数据模式。( 0 : MSB，非 0 ：LSB)                |
+| SPI_IOC_RD_BITS_PER_WORD | 设置 SPI 读取设备的字长                                      |
+| SPI_IOC_WR_BITS_PER_WORD | 设置 SPI 写入设备的字长                                      |
+| SPI_IOC_RD_MAX_SPEED_HZ  | 设置读取 SPI 设备的最大通信频率                              |
+| SPI_IOC_WR_MAX_SPEED_HZ  | 设置写入 SPI 设备的最大通信速率                              |
+|    SPI_IOC_MESSAGE(N)    | 一次进行双向/多次读写操作                                    |
+
+SPI 的读取和写入可以设置为不同的参数。
+
+#### 17.3 LubanCat4 板卡 spi 接口
+
+40pin 引脚中只有一组 spi 接口 SCK，MOSI，MISO, 有两个默认片选信号CS0，CS1。
+
+LubanCat4 使用 `spi0`。`spidev0.0` 控制 `CS0`，`spidev0.1` 控制 `CS1`
+
+|  SPI  | 物理引脚 | 功能                  |
+| :---: | :------: | --------------------- |
+| MOSI  |    19    | 主设备输出/从设备输入 |
+| MISO  |    21    | 主设备输入/从设备输出 |
+| CLOCK |    23    | 时钟信号线            |
+|  CS0  |    24    | 片选信号线 0          |
+|  CS1  |    26    | 片选信号线 1          |
+
+![image-20241030165415410](.assets/image-20241030165415410.png)
+
+##### 17.3.1 使能 SPI 通信接口
+
+SPI 接口在默认情况是关闭状态的，需要使能才能使用：
+
+```bash
+sudo fire-config
+```
+
+进入 fire-config 可视化配置界面开启 `spi0-m2` 选项，保存退出后重启系统。
+
+```bash
+sudo reboot
+```
+
+##### 17.3.2 检查 SPI 设备
+
+```
+sudo -i
+ls /dev/spi*
+```
+
+SPI_0 对应的设备文件是 `spidev0.0` 和 `spidev0.1`:
+
+![image-20241102163245250](.assets/image-20241102163245250.png)`spidev0.0` 和 `spidev0.1` 的区别在于片选信号的不同，`spidev0.0` 使用 CS0 , `spidev0.1` 使用 CS1。
+
+#### 17.4 SPI 回环通讯测试实验
+
+##### 17.4.1 硬件连接
+
+只需要将 SPI0 的 MIOS 与 MOSI 引脚 ( 板卡上的19 和 21) 使用跳线帽短接即可。
+
+##### 17.4.2 编写程序
+
+SPI 代码与上一章的 IIC 非常类似。首先打开 SPI 对应的设备文件，然后写入配置参数，这样就完成了 SPI 的初始化，后面的具体功能实现只需要调用对应的 API 函数即可。
+
+```c
+// path: base_linux/spi/spi_selftest/spi_selftest.c
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <linux/spi/spidev.h>
+
+#define SPI_DEV_PATH "/dev/spidev0.0"
+
+unsigned char tx_buffer[100] = "hello the world!";
+unsigned char rx_buffer[100];
+
+int fd; /* SPI 控制 */
+
+static unsigned mode = SPI_MODE_2; /* SPI 模式 */
+static uint8_t bits = 8;		   /* 通讯过程中一个字节所占的位数 */
+static uint32_t speed = 10000000;  /* 通信波特率 */
+static uint16_t delay;			   /* 如果不为零则用于设置两次传输之间的时间延迟 */
+
+void transfer(int fd, uint8_t const *tx, uint8_t const *rx, size_t len)
+{
+    int ret;
+
+    struct spi_ioc_transfer tr = {
+        .tx_buf = (unsigned long)tx,
+        .rx_buf = (unsigned long)rx,
+        .len = len,                   /* 一次传输的数据长度 */
+        .delay_usecs = delay,
+        .speed_hz = speed,
+        .bits_per_word = bits,
+        .tx_nbits = 1,                /* 写数据宽度，支持1,2,4位宽度,默认1或0(0表示宽度为1) */
+        .rx_nbits = 1
+    };
+
+    ret = ioctl(fd, SPI_IOC_MESSAGE(1), &tr); /* SPI_IOC_MESSAGE(1)中的1表示传输次数 */
+    if (ret < 1)
+        printf("can't send spi message\n");
+}
+
+void spi_init(void)
+{
+    int ret = 0;
+
+    fd = open(SPI_DEV_PATH, O_RDWR);
+    if (fd < 0)
+        printf("can't open %s\n", SPI_DEV_PATH);
+
+    ret = ioctl(fd, SPI_IOC_WR_MODE32, &mode);
+    if (ret == -1)
+        printf("can't set spi mode\n");
+
+    ret = ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
+    if (ret == -1)
+        printf("can't set bits per word\n");
+
+    ret = ioctl(fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed);
+    if (ret == -1)
+        printf("can't set max speed hz\n");
+
+    printf("spi mode: 0x%x\n", mode);
+    printf("bits per word: %d\n", bits);
+    printf("max speed: %d Hz (%d KHz)\n", speed, speed / 1000);
+}
+
+int main(int argc, char *argv[])
+{
+    spi_init();
+
+    transfer(fd, tx_buffer, rx_buffer, sizeof(tx_buffer));
+
+    printf("tx_buffer: \n %s\n", tx_buffer);
+    printf("rx_buffer: \n %s\n", rx_buffer);
+
+    close(fd);
+    return 0;
+}
+
+```
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/spi/spi_selftest/Makefile
+TARGET = spi_selftest
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = 
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+##### 17.4.3 编译 & 运行
+
+```bash
+make
+sudo ./spi_selftest
+```
+
+![image-20241102170822086](.assets/image-20241102170822086.png)
+
+###  18. PWM（脉宽调制）
+
+#### 18.1 脉宽调制
+
+##### 18.1.1 什么是 PWM
+
+PWM（Pulse Width Modulation）简称脉宽调制，是利用微处理器的数字输出来对模拟电路进行控制的一种非常有效的技术，广泛应用在测量、通信、工控等方面。
+
+##### 18.1.2 PWM 的频率
+
+是指在 1 秒钟内，信号从高电平到低电平再回到高电平的次数，也就是说一秒钟 PWM 有多少个周期，单位 Hz。
+
+##### 18.1.3 PWM 的周期
+
+$T=1/f$，$T$ 是周期，$f$ 是频率。
+
+如果频率为 50Hz ，也就是说一个周期是 20ms，那么一秒钟就有 50 次 PWM 周期。
+
+##### 18.1.4 占空比
+
+是一个脉冲周期内，高电平的时间与整个周期时间的比例，单位是 % (0%-100%)
+
+一个周期的长度，如下图所示：
+
+![image-20241102175704015](.assets/image-20241102175704015.png)
+
+其中，周期是一个脉冲信号的时间，1s 内的周期 $T$ 次数等于频率 $f$，**脉宽时间是指高电平时间**。上图中，脉宽时间占总周期时间的比例，就是占空比。比方说，周期的时间是10ms，脉宽时间是 8ms，那么占空比是 8/10= 80%，这就是占空比为80%的脉冲信号。PWM 就是脉冲宽度调制，通过调节占空比就可以调节脉冲宽度。
+
+##### 18.1.5 PWM 原理
+
+假设高电平为 5V、低电平则为 0V，那么要输出不同的模拟电压就要用到 PWM。通过改变 IO 口输出的方波的占空比，从而获得使用数字信号模拟成的模拟电压信号。电压是以一种脉冲序列被加到模拟负载上去的，接通时是高电平1，断开时是低电平0。接通时直流供电输出，断开时直流供电断开。通过对接通和断开时间的控制，理论上来讲，可以输出任意不大于最大电压值 5V 的模拟电压。比方说，占空比为 50% 那就是高电平时间一半，低电平时间一半。在一定的频率下，就可以得到模拟的 2.5V 输出电压。那么 75% 的占空比，得到的电压就是 3.75V，如下图所示。
+
+![image-20241102175951791](.assets/image-20241102175951791.png)
+
+#### 18.2 LubanCat4 PWM 引脚
+
+|    板卡    | PIN 12 | PIN 32 | PIN 33 | PIN 35 |
+| :--------: | :----: | :----: | :----: | :----: |
+| LubanCat 4 | pwm 14 | pwm 15 | pwm 10 | pwm 11 |
+
+##### 18.2.1 使能 PWM 接口功能
+
+```bash
+sudo fire-config
+sudo reboot
+```
+
+使能 `pwm10-m2` 和 `pwm11-ir-m3`：
+
+![image-20241102180452733](.assets/image-20241102180452733.png)
+
+##### 18.2.2 检查 PWM 设备
+
+使能 pwm 通信接口后，可以用以下命令查看 pwm 是否开启：
+
+```bash
+ls /sys/class/pwm/
+cat /sys/kernel/debug/pwm
+```
+
+![image-20241102180841855](.assets/image-20241102180841855.png)
+
+`pwmchip0` 为屏幕的背光，系统默认开启，当开启多个 pwm 设备树插件时，pwm 控制器值越小，系统分配的 pwmchip 越小。
+
+例如同时开启了 `pwm10`，`pwm11`， `pwm14`， 那么会出现以下对应关系：
+
+```
+pwm4 -> pwmchip0 (屏幕背光)
+pwm10 -> pwmchip1
+pwm11 -> pwmchip2
+pwm14 -> pwmchip3
+```
+
+LubanCat4 系统默认开启风扇的 PWM，以及两个 mipi 屏幕的背光 PWM，如果打开 PWM10
+和 PWM11 设备树插件后，效果如上图。
+
+```
+pwm0 -> pwmchip0 -> 风扇
+pwm2 -> pwmchip1 -> 屏幕背光1
+pwm6 -> pwmchip2 -> 屏幕背光2
+pwm10 -> pwmship3
+pwm11 -> pwmchip4 
+```
+
+#### 18.3 PWM 控制方式 (Shell)
 
 
 
