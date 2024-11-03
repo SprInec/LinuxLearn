@@ -21,7 +21,6 @@
 #include <linux/fb.h>   // 包含 framebuffer 相关的头文件
 #include <sys/ioctl.h>  // ioctl 系统调用头文件
 
-
 // 32 位的颜色
 #define Black 0x00000000
 #define White 0xFFFFFFFF
@@ -38,6 +37,7 @@ int main(void)
 {
     unsigned int i;
     int ret;
+    char input_char;
 
     // 打开 framebuffer 设备
     fd = open("/dev/fb0", O_RDWR);
@@ -70,10 +70,28 @@ int main(void)
     memset(fb_mem, 0xff, var.xres * var.yres * 4);
     sleep(1);
 
-    // 将屏幕填充为蓝色
-    for (i = 0; i < var.xres * var.yres; i++)
-        fb_mem[i] = Blue;
-    sleep(2);
+    for (char j = 0; j < 5; j++)
+    {
+        // 将屏幕填充为白色
+        for (i = 0; i < var.xres * var.yres; i++)
+            fb_mem[i] = White;
+        sleep(1);
+
+        // 将屏幕填充为红色
+        for (i = 0; i < var.xres * var.yres; i++)
+            fb_mem[i] = Red;
+        sleep(1);
+
+        // 将屏幕填充为绿色
+        for (i = 0; i < var.xres * var.yres; i++)
+            fb_mem[i] = Green;
+        sleep(1);
+
+        // 将屏幕填充为蓝色
+        for (i = 0; i < var.xres * var.yres; i++)
+            fb_mem[i] = Blue;
+        sleep(1);
+    }
 
     // 清屏
     memset(fb_mem, 0x00, var.xres * var.yres * 4);
