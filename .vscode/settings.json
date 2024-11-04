@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "i2c_mpu6050.h": "c",
-        "select.h": "c"
+        "select.h": "c",
+        "xf86drm.h": "c",
+        "xf86drmmode.h": "c",
+        "drm.h": "c"
     }
 }
