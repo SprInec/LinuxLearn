@@ -6382,7 +6382,7 @@ gcc -o framebuffer framebuffer.c
 
 内核修改：
 1. 修改 `fb_fix_screeninfo.smem_len` 这个参数，而固定参数不能在应用层修改，所以需要在内
-  核里扩充它的长度
+    核里扩充它的长度
 2. 修改内核中 `mmap` 函数的分配内存的长度，dma 的传输范围
 3. 修改内核中 `fb_pan_display`，以适配显示
 
@@ -6390,7 +6390,7 @@ gcc -o framebuffer framebuffer.c
 
 1. 在应用层需要把 `xres_virtual` 扩充到 `xres` 的两倍
 2. 如果想在主屏幕上显示的话，需要设置 `fb_var_screeninfo.xoffset=0`; 在副屏幕上显示的话，需
-  要设置 `fb_var_screeninfo.xoffset=xres`;
+    要设置 `fb_var_screeninfo.xoffset=xres`;
 3. 通过 `ioctl(fd, FBIOPUT_VSCREENINFO, &var);` 修改参数
 4. 通过 `ioctl(fd, FBIOPAN_DISPLAY, &var);`  把参数传入到内核里，就可以切换屏幕了
 
@@ -6646,8 +6646,169 @@ int main(int argc, char **argv)
 详细参考代码如下：
 
 ```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
 
+struct drm_device {
+    uint32_t width;     // 显示器的宽的像素点数量
+    uint32_t height;    // 显示器的高的像素点数量
+    uint32_t pitch;     // 每行占据的字节数
+    uint32_t handle;    // drm_mode_create_dumb() 的返回句柄
+    uint32_t size;      // 显示器占据的总字节数
+    uint32_t *vaddr;    // mmap 的首地址
+    uint32_t fb_id;     // 创建的 framebuffer 的 id 号
+    struct drm_mode_create_dumb create; //创建的 dumb
+    struct drm_mode_map_dumb map;       // 内存映射结构体
+};
+
+drmModeConnector *conn; // connetor 相关的结构体
+drmModeRes *res;       // 资源相关的结构体
+uint32_t conn_id;      // connetor 连接器的 id 号
+uint32_t crtc_id;      // crtc 的 id 号
+int fd;                // drm 设备的文件描述符
+
+#define RED 0XFF0000
+#define GREEN 0x00FF00
+#define BLUE 0x0000FF
+
+struct drm_device buf;
+
+static int drm_create_fb(struct drm_device *bo)
+{
+    bo->create.width = bo->width;
+    bo->create.height = bo->height;
+    bo->create.bpp = 32;
+
+    drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+    bo->pitch = bo->create.pitch;
+
+    bo->size = bo->create.size;
+    bo->handle = bo->create.handle;
+    drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch, bo->handle, &bo->fb_id);
+
+    printf("pitch = %d, size = %d, handle = %d \n", bo->pitch, bo->size, bo->handle);
+
+    bo->map.handle = bo->create.handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+    bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bo->map.offset);
+
+    memset(bo->vaddr, 0xff, bo->size);
+
+    return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+    struct drm_mode_destroy_dumb destroy = {};
+    drmModeRmFB(fd, bo->fb_id);
+    munmap(bo->vaddr, bo->size);
+    destroy.handle = bo->handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+int drm_init(void)
+{
+    fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (fd < 0){
+        printf("Wrong\n");
+        return 0;
+    }
+
+    // 获取 drm 信息
+    res = drmModeGetResources(fd);
+    crtc_id = res->crtcs[0];
+    conn_id = res->connectors[0];
+
+    // 打印 CRTCS, 以及 conneter 的 id
+    printf("crtc = %id, conneter = %d\n", crtc_id, conn_id);
+
+    conn = drmModeGetConnector(fd, conn_id);
+    buf.width = conn->modes[1].hdisplay;
+    buf.height = conn->modes[1].vdisplay;
+
+    printf("width = %d, height = %d\n", buf.width, buf.height);
+
+    drm_create_fb(&buf);
+
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[1]);
+
+    return 0;
+}
+
+void drm_exit(void)
+{
+    drm_destroy_fb(&buf);
+    drmModeFreeConnector(conn);
+    drmModeFreeResources(res);
+    close(fd);
+}
+
+int main(int argc, char *argv[])
+{
+    int i;
+    drm_init();
+    sleep(2);
+
+    // 清屏设置颜色
+    for (i = 0; i < buf.width * buf.height; i++)
+        buf.vaddr[i] = BLUE;
+
+    sleep(2);
+    drm_exit();
+
+    exit(0);
+}
 ```
+
+> **ERROR**
+>
+> 最初在 `drm_init()` 中代码如下：
+>
+> ```c
+> buf.width = conn->modes[0].hdisplay;
+> buf.height = conn->modes[0].vdisplay;
+> ...
+> drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[0]);
+> ```
+>
+> 所用的 `mode` 为 `mode[0]`，其格式为 1024x600 屏幕无法正常显示，后更改为 `mode[1]`，其格式为 1920x1080，屏幕可正常显示。
+>
+> 原因可能如下：
+>
+> HDMI 屏幕的分辨率支持取决于设备的硬件能力和显示器的兼容性。
+>
+> 1. **显示器的原生分辨率**：一些显示器只支持特定的原生分辨率，比如 1920x1080。设置为 1024x600 时，显示器可能无法正确显示图像，甚至拒绝此模式。
+> 2. **显卡与驱动的支持**：显卡或其驱动程序对某些分辨率的支持不够稳定或完善，可能默认优先更高的分辨率。
+> 3. **HDMI 兼容性**：HDMI 协议在某些模式下可能存在特定的限制或问题，而 1920x1080 是广泛支持的标准模式，因此更可能成功显示。
+>
+> 如遇到分辨率兼容问题，选择显示器原生或 HDMI 标准模式（如 1920x1080）通常能保证更高的兼容性和稳定性。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
