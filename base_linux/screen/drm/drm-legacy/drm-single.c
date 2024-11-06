@@ -99,14 +99,14 @@ int drm_init(void)
     printf("crtc = %id, conneter = %d\n", crtc_id, conn_id);
 
     conn = drmModeGetConnector(fd, conn_id);
-    buf.width = conn->modes[0].hdisplay;
-    buf.height = conn->modes[0].vdisplay;
+    buf.width = conn->modes[1].hdisplay;
+    buf.height = conn->modes[1].vdisplay;
 
     printf("width = %d, height = %d\n", buf.width, buf.height);
 
     drm_create_fb(&buf);
 
-    drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[0]);
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[1]);
 
     return 0;
 }
