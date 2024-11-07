@@ -6773,7 +6773,7 @@ int main(int argc, char *argv[])
 }
 ```
 
-> **ERROR**
+> **ERROR** - [**DRM-legacy驱动屏幕无法显示**](#DRM-legacy驱动屏幕无法显示)
 >
 > 最初在 `drm_init()` 中代码如下：
 >
@@ -6795,6 +6795,1504 @@ int main(int argc, char *argv[])
 > 3. **HDMI 兼容性**：HDMI 协议在某些模式下可能存在特定的限制或问题，而 1920x1080 是广泛支持的标准模式，因此更可能成功显示。
 >
 > 如遇到分辨率兼容问题，选择显示器原生或 HDMI 标准模式（如 1920x1080）通常能保证更高的兼容性和稳定性。
+
+##### 24.1.1 详细代码分析
+
+总体而言，四步就可以初始化 drm 的最小显示程序：
+1. 打开设备。
+2. 获取 `crtc_id`, `connector_id`, 以及它们的结构体信息。
+3. 创建 Framebuffer。
+4. 设置 CRTC。
+
+```c
+int drm_init(void)
+{
+    // 打开 drm 设备，设备会随设备树的更改而改变, 多个设备时，需留意下每个屏幕设备对应的 drm 设备
+    fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if (fd < 0){
+        printf("Wrong\n");
+        return 0;
+    }
+
+    // 获取 drm 信息
+    res = drmModeGetResources(fd);
+    crtc_id = res->crtcs[0];
+    conn_id = res->connectors[0];
+
+    // 打印 CRTCS, 以及 conneter 的 id
+    printf("crtc = %id, conneter = %d\n", crtc_id, conn_id);
+
+    conn = drmModeGetConnector(fd, conn_id);
+    buf.width = conn->modes[1].hdisplay;
+    buf.height = conn->modes[1].vdisplay;
+	
+    // 打印屏幕分辨率
+    printf("width = %d, height = %d\n", buf.width, buf.height);
+
+    // 创建 framebuffer 层
+    drm_create_fb(&buf);
+	
+    // 设置 CRTCS
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[1]);
+
+    return 0;
+}
+```
+
+- 打开设备，drm 设备的位置在 `/dev/dri/cardx`， 如果被占用无法打开会报错。
+
+    除了上述的打开方式还可以使用专用的 drm 设备打开函数，LubanCat4 使用的是 rockchip 的芯片，因此可使用官方的驱动，使用 ”rockchip”。
+
+    ```c
+    fd = drmOpen("rockchip", NULL);
+    	if (fd < 0) {
+    	printf("failed to open rockchip drm\n");
+    	return fd;
+    }
+    
+    // 这是 modetest 程序里的设备匹配表
+    static const char * const modules[] = {
+    	"i915" , "amdgpu" , "radeon" , "nouveau" ,
+    	"vmwgfx" , "omapdrm" , "exynos" , "tilcdc",
+    	"msm" , "sti" , "tegra" , "imx-drm",
+    	"rockchip" , "atmel-hlcdc" , "fsl-dcu-drm",
+    	"vc4" , "virtio_gpu" , "mediatek" , "meson",
+    	"pl111" , "stm" , "sun4i-drm",
+    };
+    ```
+
+- 获取 drm 的资源，获取并打印 CRTC 和 connector 的 id 号。
+
+    `res` 是一个指向 `drmModeRes` 结构体的指针，`drmModeRes` 结构体原型如下：
+
+    ```c
+    //drmModeRes 结构体原型
+    typedef struct _drmModeRes {
+    
+    	int count_fbs; //framebuffer 的数量
+    	uint32_t *fbs;
+    
+    	int count_crtcs; //crtcs 的数量
+    	uint32_t *crtcs;
+    
+    	int count_connectors; //connectors 的数量
+    	uint32_t *connectors;
+    	int count_encoders; //encodersr 的数量
+    	uint32_t *encoders;
+    
+    	uint32_t min_width, max_width; //最小宽度和最大宽度
+    	uint32_t min_height, max_height; //最小高度和最大高度
+    
+    } drmModeRes, *drmModeResPtr;
+    ```
+
+- 通过 connectors 的 id 获取 connector 的资源，将屏幕的宽度和高度记录在结构体中，并将其打印。
+
+    conn 是一个指向 `drmModeConnector` 结构体的指针，`drmModeConnector` 结构体原型如下：
+
+    ```c
+    // conn 结构体原型
+    typedef struct _drmModeConnector {
+    	uint32_t connector_id; //自身的id
+    	uint32_t encoder_id; //相连接的encoder_id
+    	uint32_t connector_type;
+    	uint32_t connector_type_id;
+    	drmModeConnection connection; //connector 的连接信息枚举
+    	uint32_t mmWidth, mmHeight; /**< HxW in millimeters */
+    	drmModeSubPixel subpixel; //子像素枚举
+    
+    	int count_modes; //模式数量
+    	drmModeModeInfoPtr modes; //存放分辨率，时序，时钟等信息的指针
+    
+    	int count_props; //atomic 模式使用的
+    	uint32_t *props; /**< List of property ids */
+    	uint64_t *prop_values; /**< List of property values */
+    
+    	int count_encoders; //encoder 的数量
+    	uint32_t *encoders;/**< List of encoder ids */
+    } drmModeConnector, *drmModeConnectorPtr;
+    
+    // modes 指针
+    typedef struct _drmModeModeInfo {
+    	uint32_t clock; //时钟信息，这里是mipi 屏的时钟，单位KHz
+    	//hdisplay 宽分辨率，vdisplay 高分辨率，其他则为屏幕的timing
+    	uint16_t hdisplay, hsync_start, hsync_end, htotal, hskew;
+    	uint16_t vdisplay, vsync_start, vsync_end, vtotal, vscan;
+    
+    	uint32_t vrefresh; //屏幕刷新率
+    
+    	uint32_t flags;
+    	uint32_t type;
+    	char name[DRM_DISPLAY_MODE_LEN]; //显示模式名字
+    	} drmModeModeInfo, *drmModeModeInfoPtr;
+    
+    //如果hdmi 支持多种模式，就会有多个modes 与之对应
+    ```
+
+- 创建 framebuffer，并将 `mmap` 到用户内存上
+
+- 设置 CRTCS，在这一步我们就可以在屏幕上看到东西了
+
+**framebuffer 与 crtc 的关系图**
+
+<img src=".assets/image-20241106190352735.png" alt="image-20241106190352735" style="zoom:50%;" />
+
+`drmModeSetCrtc` 函数原型：
+
+```c
+int drmModeSetCrtc(int fd, uint32_t crtcId, uint32_t bufferId,
+				   uint32_t x, uint32_t y, uint32_t *connectors, int count,
+                   drmModeModeInfoPtr mode);
+```
+
+`fd`: 文件描述符。
+
+`crtcId` : 要配置的 crtc-id 号。
+
+`bufferI` : 要配置的 framebuffer-id 号。
+
+`x` : x 轴偏移量，设置偏移量就可以显示 framebuffer 的其他区域。
+
+`y` : y 轴偏移量，设置偏移量就可以显示 framebuffer 的其他区域。
+
+`connectors` : 要连接的 connectors-id 号。
+
+`count` : connector_count。
+
+`mode` : 想要使用的模式。
+
+初始化就完成了，之后就可以通过 framebuffer 操作屏幕了。
+创建 framebuffer 部分说明如下：
+
+```c
+struct drm_device {
+	struct drm_mode_create_dumb create ; //创建的dumb
+	struct drm_mode_map_dumb map; //内存映射结构体
+};
+
+static int drm_create_fb(struct drm_device *bo)
+{
+    bo->create.width = bo->width;
+    bo->create.height = bo->height;
+    bo->create.bpp = 32;
+
+    drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+    bo->pitch = bo->create.pitch;
+
+    bo->size = bo->create.size;
+    bo->handle = bo->create.handle;
+    drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch, bo->handle, &bo->fb_id);
+
+    printf("pitch = %d, size = %d, handle = %d \n", bo->pitch, bo->size, bo->handle);
+
+    bo->map.handle = bo->create.handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+    bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, bo->map.offset);
+
+    memset(bo->vaddr, 0xff, bo->size);
+
+    return 0;
+}
+```
+
+- `drm_mode_create_dumb` 结构体用于构建 framebuffer 的属性。
+
+```c
+// 结构体原型
+struct drm_mode_create_dumb {
+	__u32 height; //高占用的像素点
+	__u32 width; //宽占用的像素点
+	__u32 bpp; //每个像素的位数
+	__u32 flags;
+	//下面的参数，创建之后会返回
+	/* handle, pitch, size will be returned */
+	__u32 handle; //用于mmap
+	__u32 pitch; //每行字节数
+    __u64 size; //总字节数
+};
+```
+
+- `drm_mode_map_dumb` 用于构建 mmap 内存区域。
+
+```c
+/* set up for mmap of a dumb scanout buffer */
+struct drm_mode_map_dumb {
+	/* Handle for the object being mapped. */
+	__u32 handle;
+	__u32 pad;
+	/* Fake offset to use for subsequent mmap call
+	 * This is a fixed-size type for 32/64 compatibility.*/
+	__u64 offset;
+};
+```
+
+- 构建 framebuffer 的大小属性，本次实验把 framebuffer 的大小构建成和显示区域一样的大小，可以更改数值以构建更大的 framebuffer 属性。
+- 提交创建的属性，如果通过就会返回 `drm_mode_create_dumb` 的其他属性。
+- 将返回的属性值传入到全局变量 `drm_device` 中。
+- 创建 Framebuffer。
+
+```c
+// 函数原型及衍生
+/* Creates a new framebuffer with an buffer object as its scanout buffer.*/
+extern int drmModeAddFB(int fd, uint32_t width, uint32_t height, uint8_tdepth,
+uint8_t bpp, uint32_t pitch, uint32_t bo_handle,uint32_t *buf_id);
+/* ...with a specific pixel format */
+extern int drmModeAddFB2(int fd, uint32_t width, uint32_t height,
+uint32_t pixel_format, const uint32_t bo_handles[4],
+const uint32_t pitches[4], const uint32_t offsets[4],
+uint32_t *buf_id, uint32_t flags);
+extern drmModeFBPtr drmModeGetFB(int fd, uint32_t bufferId);
+```
+
+这里，主要讲述 `drmModeAddFB` 函数，其他函数可以自行阅读源码进行理解。
+
+`drmModeAddFB` 函数分析：
+
+1. `fd` ：文件描述符。
+
+2. `width` ：framebuffer 宽的像素点数量。
+3. `height` ：framebuffer 高的像素点数量。
+4. `depth` ：framebuffer 每个像素的实际位数，三个字节-RGB888。
+5. `bpp` ：每个像素的占用的位数，四个字节-XRGB8888。
+6. `pitch` ：每行占用的字节数：720x4。
+7. `bo_handle` ：上文中创建 dumb 的返回值。
+8. `buf_id` ：framebuffer 的 id 号，以指针的形式传入，函数成功后，返回数值。
+
+`drmModeAddFB2` 函数：创建特殊格式的 framebuffer，例如 YUV，C8 格式。
+
+`drmModeGetFB` 函数：获取 framebuffer 的资源。
+
+```c
+// 结构体原型
+typedef struct _drmModeFB {
+	uint32_t fb_id;
+	uint32_t width, height;
+	uint32_t pitch;
+	uint32_t bpp;
+	uint32_t depth;
+	/* driver specific handle */
+	uint32_t handle;
+} drmModeFB, *drmModeFBPtr;
+```
+
+- 设置 mmap, 映射 framebuffer 的内存区域到用户空间里。
+- 将 framebuffer 区域全部变成白色。
+
+经过这几步，就成功创建 framebuffer 并映射到用户空间中，供用户使用。
+
+1. 构建 framebuffer 区域的属性，创建 dumb。
+2. 根据属性创建 framebuffer。
+3. 根据句柄，映射 framebuffer 到用户空间。
+
+```c
+void drm_exit(void)
+{
+    drm_destroy_fb(&buf);
+    drmModeFreeConnector(conn);
+    drmModeFreeResources(res);
+    close(fd);
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+    struct drm_mode_destroy_dumb destroy = {};
+    drmModeRmFB(fd, bo->fb_id);
+    munmap(bo->vaddr, bo->size);
+    destroy.handle = bo->handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+```
+
+注销 drm 的函数比较简单，只需以下几步：
+1. 删除 framebuffer，取消内存的映射，摧毁 dumb。
+2. 释放 connector 资源。
+3. 释放 resource 资源。
+4. 关闭文件描述符。
+
+##### 24.1.2 编译
+
+Makefile 文件：
+
+```makefile
+TARGET = drm-single
+CC = gcc
+CFLAGS = -I .
+OBJS = $(TARGET).o
+BUILD_DIR = build
+DEPS = 
+LIBDRM = `pkg-config --cflags libdrm` `pkg-config --libs libdrm`
+
+$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LIBDRM)
+	@mkdir -p $(BUILD_DIR)
+	@mv *.o $(BUILD_DIR)
+	@cp $(TARGET) $(BUILD_DIR)
+
+%.o: %.c $(DEPS)
+	$(CC) -c -o $@ $< $(CFLAGS) $(LIBDRM)
+
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+```
+
+```sudo
+make
+```
+
+##### 24.1.3 运行
+
+```sudo
+./drm-single
+```
+
+现象如下：
+
+屏幕先变白后变蓝，然后程序退出后屏幕变为黑屏。而在终端中可以看到程序输出了屏幕的 crtc的 id 以及 conneter 的 id、分辨率、每行的字节数以及总字节数。
+
+#### 24.2 双缓冲 DRM ( drm-double )
+
+双缓冲的原理是改变CRTC 的扫描内存的位置。
+
+##### 24.2.1 单 framebuffer 双缓冲
+
+创建一个两倍于显示区域的 framebuffer，通过改变偏移量进行帧的切换，扫完一帧后就切换另一帧显示。
+
+![image-20241106195024090](.assets/image-20241106195024090.png)
+
+```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+struct drm_device {
+    uint32_t width;                 //显示器的宽的像素点数量
+    uint32_t height;                //显示器的高的像素点数量
+    uint32_t pitch;                 //每行占据的字节数
+    uint32_t handle;                //drm_mode_create_dumb的返回句柄
+    uint32_t size;                  //显示器占据的总字节数
+    uint32_t *vaddr;                //mmap的首地址
+    uint32_t fb_id;                 //创建的framebuffer的id号
+    struct drm_mode_create_dumb create ;    //创建的dumb
+    struct drm_mode_map_dumb map;           //内存映射结构体
+};
+
+drmModeConnector *conn;     //connetor相关的结构体
+drmModeRes *res;            //资源
+uint32_t conn_id;           //connetor的id号
+uint32_t crtc_id;           //crtc的id号
+int fd;                     //文件描述符
+
+#define RED 0XFF0000
+#define GREEN 0X00FF00
+#define BLUE 0X0000FF
+
+struct drm_device buf;
+
+static int drm_create_fb(struct drm_device *bo)
+{
+    /* create a dumb-buffer, the pixel format is XRGB888 */
+    bo->create.width = bo->width;
+    bo->create.height = bo->height*2;
+    bo->create.bpp = 32;
+
+    /* handle, pitch, size will be returned */
+    drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+    /* bind the dumb-buffer to an FB object */
+    bo->pitch = bo->create.pitch;
+    bo->size = bo->create.size;
+    bo->handle = bo->create.handle;
+    drmModeAddFB(fd, bo->width, bo->height*2, 24, 32, bo->pitch,
+                 bo->handle, &bo->fb_id);
+
+    //每行占用字节数，共占用字节数，MAP_DUMB的句柄
+    printf("pitch = %d ,size = %d, handle = %d \n",bo->pitch,bo->size,bo->handle);
+
+    /* map the dumb-buffer to userspace */
+    bo->map.handle = bo->create.handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+    bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE,
+                     MAP_SHARED, fd, bo->map.offset);
+
+    /* initialize the dumb-buffer with white-color */
+    memset(bo->vaddr, 0x00,bo->size);
+
+    return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+    struct drm_mode_destroy_dumb destroy = {};
+    drmModeRmFB(fd, bo->fb_id);
+    munmap(bo->vaddr, bo->size);
+    destroy.handle = bo->handle;
+    drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+int drm_init()
+{
+    //打开drm设备，设备会随设备树的更改而改变,多个设备时，请留一下每个屏幕设备对应的drm设备
+    fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if(fd < 0){
+        printf("wrong\n");
+        return 0;
+    }
+
+    //获取drm的信息
+    res = drmModeGetResources(fd);
+    crtc_id = res->crtcs[0];
+    conn_id = res->connectors[0];
+    //打印CRTCS,以及conneter的id
+    printf("crtc = %d , conneter = %d\n",crtc_id,conn_id);
+
+    conn = drmModeGetConnector(fd, conn_id);
+    buf.width = conn->modes[1].hdisplay;
+    buf.height = conn->modes[1].vdisplay;
+
+    //打印屏幕分辨率
+    printf("width = %d , height = %d\n",buf.width,buf.height);
+
+    //创建framebuffer层
+    drm_create_fb(&buf);
+
+    //设置CRTCS
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                   0, 0, &conn_id, 1, &conn->modes[1]);
+
+    return 0;
+}
+
+void drm_exit()
+{
+    drm_destroy_fb(&buf);
+    drmModeFreeConnector(conn);
+    drmModeFreeResources(res);
+    close(fd);
+}
+
+int main(int argc, char **argv)
+{
+    int i;
+    int size;
+    drm_init();
+    size = buf.width*buf.height;
+    // buffer上层布满红色
+    for(i=0;i<size;i++)
+            buf.vaddr[i] = RED;
+    // buffer下层布满蓝色
+    for(i=size;i<size*2;i++)
+            buf.vaddr[i] = BLUE;
+    
+    for (int count = 0; count < 5; count++)
+    {
+        // 切换buffer下层
+       drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                      0, 1080, &conn_id, 1, &conn->modes[1]);
+        // 注意根据实际修改1080这个参数，为当前测试屏幕height，如果是1024*600的屏幕，
+        // 就将1080修改为600.
+
+        sleep(2);
+
+        // 切换buffer上层
+        drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                       0, 0, &conn_id, 1, &conn->modes[1]);
+
+        sleep(2);
+    }
+
+    drm_exit();
+
+    exit(0);
+}
+```
+
+与 *24.1 最简单 DRM（drm-single）*不同的是，
+
+1. 把 dumb 的高度扩大了一倍。
+
+    ```c
+    bo->create.height = bo->height*2
+    ```
+
+2. 在创建 framebuffer 的时候，把高度扩展了一倍。
+
+    ```c
+    drmModeAddFB(fd, bo->width, bo->height*2, 24, 32, bo->pitch,
+                     bo->handle, &bo->fb_id);
+    ```
+
+3. 切换的操作使用 `drmModeSetCrtc()` 函数，该函数可以使用偏移量将 framebuffer 向下移动一个显示区域的大小这样，屏幕就会显示出不一样的内容。
+
+    ```c
+    // 切换buffer下层
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                   0, 1080, &conn_id, 1, &conn->modes[1]);
+    // 注意根据实际修改1080这个参数，为当前测试屏幕height，如果是1024*600的屏幕，
+    // 就将1080修改为600.
+    
+    sleep(2);
+    
+    // 切换buffer上层
+    drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                   0, 0, &conn_id, 1, &conn->modes[1]);
+    
+    sleep(2);
+    ```
+
+##### 24.2.2 多 framebuffer 双缓冲
+
+创建两个 framebuffer，通过切换 framebuffer 来进行双缓冲的显示。
+
+![image-20241106203642116](.assets/image-20241106203642116.png)
+
+```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+struct drm_device {
+        uint32_t width;                 //显示器的宽的像素点数量
+        uint32_t height;                //显示器的高的像素点数量
+        uint32_t pitch;                 //每行占据的字节数
+        uint32_t handle;                //drm_mode_create_dumb的返回句柄
+        uint32_t size;                  //显示器占据的总字节数
+        uint32_t *vaddr;                //mmap的首地址
+        uint32_t fb_id;                 //创建的framebuffer的id号
+        struct drm_mode_create_dumb create ;    //创建的dumb
+        struct drm_mode_map_dumb map;           //内存映射结构体
+};
+
+drmModeConnector *conn; //connetor相关的结构体
+drmModeRes *res;        //资源
+int fd;                 //文件描述符
+uint32_t conn_id;
+uint32_t crtc_id;
+
+#define RED     0XFF0000
+#define GREEN   0X00FF00
+#define BLUE    0X0000FF
+#define WHITE   0XFFFFFF
+#define BLACK   0X000000
+
+uint32_t color_table[5]={RED,GREEN,BLUE,WHITE,BLACK};
+
+struct drm_device buf[2];
+
+static int drm_create_fb(struct drm_device *bo)
+{
+        /* create a dumb-buffer, the pixel format is XRGB888 */
+        bo->create.width = bo->width;
+        bo->create.height = bo->height;
+        bo->create.bpp = 32;
+
+        /* handle, pitch, size will be returned */
+        drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+        /* bind the dumb-buffer to an FB object */
+        bo->pitch = bo->create.pitch;
+        bo->size = bo->create.size;
+        bo->handle = bo->create.handle;
+        drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch,
+                           bo->handle, &bo->fb_id);
+
+        //每行占用字节数，共占用字节数，MAP_DUMB的句柄
+        printf("pitch = %d ,size = %d, handle = %d \n",bo->pitch,bo->size,bo->handle);
+
+        /* map the dumb-buffer to userspace */
+        bo->map.handle = bo->create.handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+        bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd, bo->map.offset);
+
+        /* initialize the dumb-buffer with white-color */
+        memset(bo->vaddr, 0x00,bo->size);
+
+        return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+        struct drm_mode_destroy_dumb destroy = {};
+        drmModeRmFB(fd, bo->fb_id);
+        munmap(bo->vaddr, bo->size);
+        destroy.handle = bo->handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+int drm_init()
+{
+        //打开drm设备，设备会随设备树的更改而改变,多个设备时，请留一下每个屏幕设备对应的drm设备
+        fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if(fd < 0){
+        printf("wrong\n");
+        return 0;
+    }
+
+        //获取drm的信息
+        res = drmModeGetResources(fd);
+        crtc_id = res->crtcs[0];
+        conn_id = res->connectors[0];
+        //打印CRTCS,以及conneter的id
+        printf("crtc = %d , conneter = %d\n",crtc_id,conn_id);
+
+        conn = drmModeGetConnector(fd, conn_id);
+        buf[0].width = conn->modes[1].hdisplay;
+        buf[0].height = conn->modes[1].vdisplay;
+
+        buf[1].width = conn->modes[1].hdisplay;
+        buf[1].height = conn->modes[1].vdisplay;
+
+        //打印屏幕分辨率
+        printf("width = %d , height = %d\n",buf[0].width,buf[0].height);
+
+        //创建framebuffer层
+        drm_create_fb(&buf[0]);
+        drm_create_fb(&buf[1]);
+
+        //设置CRTCS
+        drmModeSetCrtc(fd, crtc_id, buf[0].fb_id,
+                        0, 0, &conn_id, 1, &conn->modes[1]);
+
+        return 0;
+}
+
+int drm_exit()
+{
+        drm_destroy_fb(&buf[0]);
+        drm_destroy_fb(&buf[1]);
+        drmModeFreeConnector(conn);
+        drmModeFreeResources(res);
+        close(fd);
+}
+
+
+int main(int argc, char **argv)
+{
+        int i;
+        int size0,size1;
+        drm_init();
+        size0 = buf[0].width*buf[0].height;
+        size1 = buf[1].width*buf[1].height;
+        //buffer上层布满红色
+        for(i=0;i<size0;i++)
+            buf[0].vaddr[i] = RED;
+        //buffer下层布满蓝色
+        for(i=0;i<size1;i++)
+            buf[1].vaddr[i] = BLUE;
+
+
+    for (int count; count < 5; count++)
+    {
+        //切换buffer下层
+        drmModeSetCrtc(fd, crtc_id, buf[1].fb_id,
+                       0, 0, &conn_id, 1, &conn->modes[1]);
+        sleep(2);
+
+        //切换buffer上层
+        drmModeSetCrtc(fd, crtc_id, buf[0].fb_id,
+                       0, 0, &conn_id, 1, &conn->modes[1]);
+        sleep(2);
+    }
+
+        drm_exit();
+        exit(0);
+}
+```
+
+- 定义里两个结构体，他们分别存放 framebuffer 信息论
+- 分别获取分辨率
+- 分别设置 framebuffer，并将他们的内存映射到用户空间内
+- 将屏幕设置成 buf[0] 的数据;
+
+可以看到与单 framebuffer 相比，格式几乎一模一样，最大的区别是传入的 fb_id 以及没有偏移量的产生，即操作传入的 fb_id 就可以操作屏幕。
+
+**总结**：
+
+这两个方法各有各的好处，单 framebuffer 简单，写起来更快捷，适合于图像简单的场景，多 framebuffer
+复杂，但是扩展性更强，在多 framebuffer 的情况下，可以单独扩展每个 framebuffer 的大小，
+适合图像比较复杂的场景。
+
+#### 24.3 页翻转
+
+`drmModePageFlip()` 的功能和 `drmModeSetCrtc()` 一样是用于更新显示内容的，但是它和 `drmMode-SetCrtc()` 最大的区别在于，`drmModePageFlip()` 只会等到 `VSYNC`  到来后才会真正执行 framebuffer切换动作，而 `drmModeSetCrtc()` 则会立即执行framebuffer 切换动作。`drmModeSetCrtc()` 对于某些硬件来说，很容易造成撕裂（tear effect）问题，而 `drmModePageFlip()` 则不会造成这种问题。
+
+由于`drmModePageFlip()` 本身是基于 `VSYNC` 事件机制的，因此底层 DRM 驱动必须支持 `VBLANK`事件。
+
+![image-20241107114526089](.assets/image-20241107114526089.png)
+
+##### 24.3.1 页翻转实验
+
+```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+#include <signal.h>
+
+struct drm_device {
+        uint32_t width;                 //显示器的宽的像素点数量
+        uint32_t height;                //显示器的高的像素点数量
+        uint32_t pitch;                 //每行占据的字节数
+        uint32_t handle;                //drm_mode_create_dumb的返回句柄
+        uint32_t size;                  //显示器占据的总字节数
+        uint32_t *vaddr;                //mmap的首地址
+        uint32_t fb_id;                 //创建的framebuffer的id号
+        struct drm_mode_create_dumb create ;    //创建的dumb
+        struct drm_mode_map_dumb map;           //内存映射结构体
+};
+
+
+static int terminate;
+drmModeConnector *conn; //connetor相关的结构体
+drmModeRes *res;        //资源
+drmEventContext ev;
+int count;
+
+int fd;                 //文件描述符
+uint32_t conn_id;
+uint32_t crtc_id;
+
+int status=0;
+
+#define RED 0XFF0000
+#define GREEN 0X00FF00
+#define BLUE 0X0000FF
+
+struct drm_device buf[2];
+
+
+static int drm_create_fb(struct drm_device *bo)
+{
+        /* create a dumb-buffer, the pixel format is XRGB888 */
+        bo->create.width = bo->width;
+        bo->create.height = bo->height;
+        bo->create.bpp = 32;
+
+        /* handle, pitch, size will be returned */
+        drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+        /* bind the dumb-buffer to an FB object */
+        bo->pitch = bo->create.pitch;
+        bo->size = bo->create.size;
+        bo->handle = bo->create.handle;
+        drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch,
+                           bo->handle, &bo->fb_id);
+
+        //每行占用字节数，共占用字节数，MAP_DUMB的句柄
+        printf("pitch = %d ,size = %d, handle = %d \n",bo->pitch,bo->size,bo->handle);
+
+        /* map the dumb-buffer to userspace */
+        bo->map.handle = bo->create.handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+        bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd, bo->map.offset);
+
+        /* initialize the dumb-buffer with white-color */
+        memset(bo->vaddr, 0x00,bo->size);
+
+        return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+        struct drm_mode_destroy_dumb destroy = {};
+
+        drmModeRmFB(fd, bo->fb_id);
+
+        munmap(bo->vaddr, bo->size);
+
+        destroy.handle = bo->handle;
+
+        drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+int drm_init()
+{
+
+        //打开drm设备，设备会随设备树的更改而改变,多个设备时，请留一下每个屏幕设备对应的drm设备
+        fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if(fd < 0){
+        printf("wrong\n");
+        return 0;
+    }
+
+        //获取drm的信息
+        res = drmModeGetResources(fd);
+        crtc_id = res->crtcs[0];
+        conn_id = res->connectors[0];
+        //打印CRTCS,以及conneter的id
+        printf("crtc = %d , conneter = %d\n",crtc_id,conn_id);
+
+        conn = drmModeGetConnector(fd, conn_id);
+        buf[0].width = conn->modes[1].hdisplay;
+        buf[0].height = conn->modes[1].vdisplay;
+
+        buf[1].width = conn->modes[1].hdisplay;
+        buf[1].height = conn->modes[1].vdisplay;
+
+        //打印屏幕分辨率
+        printf("width = %d , height = %d\n",buf[0].width,buf[0].height);
+
+        //创建framebuffer层
+        drm_create_fb(&buf[0]);
+        drm_create_fb(&buf[1]);
+
+        return 0;
+}
+
+int drm_exit()
+{
+        drm_destroy_fb(&buf[0]);
+        drm_destroy_fb(&buf[1]);
+        drmModeFreeConnector(conn);
+        drmModeFreeResources(res);
+        close(fd);
+}
+
+
+static void drm_page_flip_handler(int fd, uint32_t frame,
+                                    uint32_t sec, uint32_t usec,
+                                    void *data)
+{
+        static int i = 0;
+        uint32_t crtc_id = *(uint32_t *)data;
+        if(i==0)
+                i=1;
+        else if(i==1)
+                i=0;
+        drmModePageFlip(fd, crtc_id, buf[i].fb_id,
+                        DRM_MODE_PAGE_FLIP_EVENT, data);
+}
+
+int main(int argc, char **argv)
+{
+        int i;
+        int size0,size1;
+        ev.version = DRM_EVENT_CONTEXT_VERSION;
+        ev.page_flip_handler = drm_page_flip_handler;
+
+        drm_init();
+
+        //buffer上层布满红色
+        for(i=0;i<buf[0].width*buf[0].height;i++)
+                buf[0].vaddr[i] = RED;
+        //buffer下层布满蓝色
+        for(i=0;i<buf[1].width*buf[1].height;i++)
+                buf[1].vaddr[i] = BLUE;
+
+        drmModeSetCrtc(fd, crtc_id, buf[0].fb_id,
+                        0, 0, &conn_id, 1, &conn->modes[1]);
+
+        drmModePageFlip(fd, crtc_id, buf[0].fb_id,
+                        DRM_MODE_PAGE_FLIP_EVENT, &crtc_id);
+    	for (int count; count < 5; count ++)
+    	{
+            //切换buffer下层
+            drmHandleEvent(fd, &ev);
+
+        	sleep(2);
+
+        	//切换buffer上层
+            drmHandleEvent(fd, &ev);
+
+        	sleep(2);
+   		 }
+	
+        drm_exit();
+
+        exit(0);
+}
+```
+
+该实验与多 framebuffer 双缓冲的结构差不多，以下是实验中不一样的地方：
+
+- 首先需要先定义`drmEventContext`, 然后设置 `ev.version` 和 `ev.drm_page_flip_handler` 。
+- 当运行 `drmHandleEvent(fd, &ev);` 时，就会出触发 `drm_page_flip_handler()` 函数, 进行页翻转。
+
+`drmModePageFlip` 函数原型：
+
+```c
+int drmModePageFlip ( int fd, uint32_t crtc_id, uint32_t fb_id, uint32_tflags, void * user_data )
+```
+
+1. fd : 打开的 DRM 设备的文件描述符。
+
+2. crtc_id : CRTC 要修改 framebuffer 的 CRTC ID。
+3. fb_id : Framebuffer 要显示的 Framebuffer ID。
+4. flags : 影响操作的标志。支持的值是: 
+  - DRM_MODE_PAGE_FLIP_ASYNC : 立即翻转，而不是 `vblank`
+  - DRM_MODE_PAGE_FLIP_EVENT : 发送翻页事件
+5. user_data : 如果请求 vblank 事件，则页面翻转处理程序使用的数据。
+
+#### 24.4 drm-planes
+
+Planes 有个非常强的特性：支持多个 plane 叠加，图层可以自由的剪裁，拉伸以及合成。
+
+![image-20241107124231000](.assets/image-20241107124231000.png)
+
+LubanCat4 的 HDMI 和 MIPI 接口的 CRTC 都具有三个图层，一个 PRIMARY 图层，两个 OVERLAY 图层，如
+果想要设置鼠标图层，可以按照下列操作：
+
+![image-20241107124331049](.assets/image-20241107124331049.png)
+
+##### 24.4.1 drm-planes 实验
+
+```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+struct drm_device {
+        uint32_t width;                 //显示器的宽的像素点数量
+        uint32_t height;                //显示器的高的像素点数量
+        uint32_t pitch;                 //每行占据的字节数
+        uint32_t handle;                //drm_mode_create_dumb的返回句柄
+        uint32_t size;                  //显示器占据的总字节数
+        uint32_t *vaddr;                //mmap的首地址
+        uint32_t fb_id;                 //创建的framebuffer的id号
+        struct drm_mode_create_dumb create ;    //创建的dumb
+        struct drm_mode_map_dumb map;                   //内存映射结构体
+};
+
+drmModeConnector *conn; //connetor相关的结构体
+drmModeRes *res;                //资源
+drmModePlaneRes *plane_res;//图层资源
+
+int fd;                                 //文件描述符
+uint32_t conn_id;
+uint32_t crtc_id;
+uint32_t plane_id[3];   //图层id数组
+
+
+#define RED 0XFF0000
+#define GREEN 0X00FF00
+#define BLUE 0X0000FF
+
+struct drm_device buf;
+
+uint32_t color_table[6] = {RED,GREEN,BLUE,RED,GREEN,BLUE};
+
+
+static int drm_create_fb(struct drm_device *bo)
+{
+        /* create a dumb-buffer, the pixel format is XRGB888 */
+        bo->create.width = bo->width;
+        bo->create.height = bo->height;
+        bo->create.bpp = 32;
+
+        /* handle, pitch, size will be returned */
+        drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+        /* bind the dumb-buffer to an FB object */
+        bo->pitch = bo->create.pitch;
+        bo->size = bo->create.size;
+        bo->handle = bo->create.handle;
+        drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch,
+                           bo->handle, &bo->fb_id);
+
+        //每行占用字节数，共占用字节数，MAP_DUMB的句柄
+        printf("pitch = %d ,size = %d, handle = %d \n",bo->pitch,bo->size,bo->handle);
+
+        /* map the dumb-buffer to userspace */
+        bo->map.handle = bo->create.handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+        bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd, bo->map.offset);
+
+        /* initialize the dumb-buffer with white-color */
+        memset(bo->vaddr, 0xff,bo->size);
+
+        return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+        struct drm_mode_destroy_dumb destroy = {};
+
+        drmModeRmFB(fd, bo->fb_id);
+
+        munmap(bo->vaddr, bo->size);
+
+        destroy.handle = bo->handle;
+
+        drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+int drm_init()
+{
+        int i;
+        //打开drm设备，设备会随设备树的更改而改变,多个设备时，请留一下每个屏幕设备对应的drm设备
+        fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+    if(fd < 0){
+        printf("wrong\n");
+        return 0;
+    }
+
+        drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+        plane_res = drmModeGetPlaneResources(fd);
+        printf("count_planes = %d\n",plane_res-> count_planes);
+        for(i=0;i<3;i++){
+                plane_id[i] = plane_res->planes[i];
+                printf("planes[%d]= %d\n",i,plane_id[i]);
+        }
+
+        //获取drm的信息
+        res = drmModeGetResources(fd);
+        crtc_id = res->crtcs[0];
+        conn_id = res->connectors[0];
+        //打印CRTCS,以及conneter的id
+        printf("crtc = %d , conneter = %d\n",crtc_id,conn_id);
+
+        conn = drmModeGetConnector(fd, conn_id);
+        buf.width = conn->modes[1].hdisplay;
+        buf.height = conn->modes[1].vdisplay;
+
+        //打印屏幕分辨率
+        printf("width = %d , height = %d\n",buf.width,buf.height);
+
+        //创建framebuffer层
+        drm_create_fb(&buf);
+
+        //设置CRTCS
+        drmModeSetCrtc(fd, crtc_id, buf.fb_id,
+                        0, 0, &conn_id, 1, &conn->modes[1]);
+
+        return 0;
+}
+
+int drm_exit()
+{
+        drm_destroy_fb(&buf);
+        drmModeFreeConnector(conn);
+        drmModeFreeResources(res);
+        close(fd);
+}
+
+int main(int argc, char **argv)
+{
+        int i;
+        int j = 0;
+        drm_init();
+
+        //显示三色
+        for(j=0;j<3;j++){
+                for(i =j*buf.width*buf.height/3;i< (j+1)*buf.width*buf.height/3;i++)
+                        buf.vaddr[i] = color_table[j];
+        }
+
+        getchar();
+        //将framebuffer上2/3的区域放到图层一上，
+        //此时屏幕改变，将的framebuffer区域拉伸到整个屏幕中
+        drmModeSetPlane(fd, plane_id[0], crtc_id, buf.fb_id, 0,
+                        0, 0, buf.width, buf.height,
+                        0 << 16, 0 << 16, buf.width << 16, buf.height/3*2 << 16);
+
+        getchar();
+        //将framebuffer区域缩放一倍放到图层二上，把图层二的位置放到屏幕的下方
+        //叠加在图层一上，可以看到图层二覆盖了图层一的部分区域
+        drmModeSetPlane(fd, plane_id[1], crtc_id, buf.fb_id, 0,
+                        buf.width/4, buf.height/2, buf.width/2, buf.height/2,
+                        0 << 16, 0 << 16, buf.width << 16, buf.height << 16);
+
+        getchar();
+
+        drm_exit();
+
+        exit(0);
+}
+```
+
+#### 24.5 legacy 接口函数
+
+前面使用过的 legacy 接口有下列：
+
+```c
+drmModeSetCrtc();
+drmModeSetPlane();
+```
+
+- 两个函数具有一定的重合性，部分功能两个都可以同时起作用。
+
+- 在 drm 驱动激活时，framebuffer 会与 PRIMARY Planes 绑定在一起，`drmModeSetCrtc()` 可以直接通过操作framebuffer，而不用通过设置 Planes 达到显示的效果。
+- `drmModeSetPlane()` 则是更正规的操作 Planes 的函数。
+- 在双缓冲设计，我们同样可以像 `drmModeSetCrtc()` 操作那样去使用 `drmModeSetPlane()` 来构建双缓冲，图像大小一致设置偏移量或者切换 buffer。
+
+#### 24.6 总结
+
+DRM 应用编程–legacy 接口的框架基于最简单 DRM(drm-single) 的实验，其他的操作也是在最简单 DRM(drm-single) 的实验的框架上进行修改，步骤：
+
+1. 打开设备(两种方法)。
+2. 创建 page-flip-handle ( page-flip 中使用)。
+3. 获取 plane 资源( planes 中使用)。
+4. 获取 drm 的资源，包括 crtcs 和 connecter 位号。
+5. 获取 connecter 的基本信息，高和宽的像素点。
+6. 创建 framebuffer，创建 mmap 区, 双缓冲 drm 需要额外配置 framebuffer 。
+7. 设置 CRTCS 或 page-flip 。
+8. 设置 plane 资源( planes 中使用)。
+9. 操作屏幕。
+
+### 25. DRM 应用编程–atomic 接口
+
+目前 DRM 主要推荐使用的是 Atomic（原子的）接口，前面的程序 legacy 接口已经过时了。
+
+#### 25.1 Property
+
+Property（属性）—–Atomic 操作必须依赖的基本元素。
+
+Property 把前面的 legacy 接口传入的参数单独抽出来，做成一个个独立的全局属性。通过设置这些属性参数，即可完成对显示参数的设置。
+
+![image-20241107125634576](.assets/image-20241107125634576.png)
+
+
+
+Property 的结构简单概括主要由 3 部分组成：`name`、`id` 和 `value`。其中 `id` 为该 property 在DRM 框架中全局唯一的标识符。
+
+采用 property 机制的好处是：
+
+1. 减少上层应用接口的维护工作量。当开发者有新的功能需要添加时，无需增加新的函数名和 `IOCTL`，只需在底层驱动中新增一个 property，然后在自己的应用程序中获取/操作该 property 的值即可。
+2. 增强了参数设置的灵活性。一次 `IOCTL` 可以同时设置多个 property，减少了 user space 与 kernel space 切换的次数，同时最大限度的满足了不同硬件对于参数设置的要求，提高了软件效率。
+
+DRM 中的 property 大多以功能进行划分，并且还定义了一组 Standard Properties，这些标准 properties 在任何平台上都会被创建。
+
+CRTC：
+
+|      name      | 功能                                                         |
+| :------------: | ------------------------------------------------------------ |
+|     ACTIVE     | CRTC 当前的使能状态，一般用于控制 CRTC 上下电                |
+|    MODE_ID     | CRTC 当前所使用的 display mode ID，通过该 ID 可以找到具体的 display mode 配置参数 |
+| OUT_FENCE_PTR  | 输出 fence 指针，指向当前正在显示的 buffer 所对应的 fence fd，该 fence 由 DRM 驱动创建，供上层应用程序使用，用来表示当前 buffer CRTC 是否还在占用 |
+|   GAMMA_LUT    | gamma 查找表参数                                             |
+| GAMMA_LUT_SIZE | ga_mma 查找表参数长度                                        |
+
+CONNECTOR：
+
+|    name    | 功能                                                         |
+| :--------: | ------------------------------------------------------------ |
+|    EDID    | Extended Display Identification Data，标识显示器的参数信息，是一种 VESA 标准数据格式 |
+|    DPMS    | Display Power Management Signaling，用于控制显示器的电源状态，如休眠唤醒。也是一种VESA 标准 |
+| linkstatus | 用于标识当前 connector 的连接状态，如 Good/Bad               |
+|  CRTC_ID   | 当前 connector 所连接的 CRTC object ID，与 PLANE 中 CRTC_ID 属性是同一个 property |
+
+Planes：
+
+|    name     | 功能                                                         |
+| :---------: | ------------------------------------------------------------ |
+|    type     | plane 的类型，CURSOR、PRIMARY 或者 OVERLAY                   |
+|    FB_ID    | 与当前 plane 绑定的 framebuffer object ID                    |
+| IN_FENCE_FD | 与当前 plane 相关联的 input fence fd，由 buffer 的生产者创建，供 DRM 底层驱动使用，用来标识当前传下来的 buffer 是否可以开始访问 |
+|   CRTC_ID   | 当前 plane 所关联的 CRTC object ID，与 CONNECTOR 中的 CRTC_ID 属性是同一个 property |
+|    SRC_X    | 当前 framebuffer 区域的起始偏移x 坐标                        |
+|    SRC_Y    | 当前 framebuffer 区域的起始偏移y 坐标                        |
+|    SRC_W    | 当前 framebuffer 区域的宽度                                  |
+|    SRC_H    | 当前 framebuffer 区域的高度                                  |
+|   CRTC_X    | 屏幕显示区域的起始偏移 x 坐标                                |
+|   CRTC_Y    | 屏幕显示区域的起始偏移 y 坐标                                |
+|   CRTC_W    | 屏幕显示区域的宽度                                           |
+|   CRTC_H    | 屏幕显示区域的高度                                           |
+
+如下图所示：
+
+![image-20241107130837930](.assets/image-20241107130837930.png)
+
+
+
+上图的 Properties 并非全部的 Properties，这里只列举了 drm 程序里通用的几个 Properties，如果想
+要知道更多的 Properties，后面的程序分析会有讲到。
+
+我们操作上面的 Properties 就可以设置 CRTC 以及屏幕显示。
+
+#### 25.2 DRM 应用编程 ( drm-atomic-ctrc )
+
+在前面我们使用过的 legacy 接口有：
+
+```c
+drmModeSetCrtc();
+drmModeSetPlane();
+```
+
+因此，我们从 legacy 接口到 Atomic 接口，只需要把上面的接口改成相关的接口就可以操作了。
+
+本例以 DRM 应用编程–legacy 接口的 drm-planes 实验为基础， 修改 legacy 接口的 `drmModeSetCrtc();` 为atomic 接口。
+
+```c
+#define _GNU_SOURCE
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+#include <time.h>
+#include <unistd.h>
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+struct drm_device {
+        uint32_t width;                 //显示器的宽的像素点数量
+        uint32_t height;                //显示器的高的像素点数量
+        uint32_t pitch;                 //每行占据的字节数
+        uint32_t handle;                //drm_mode_create_dumb的返回句柄
+        uint32_t size;                  //显示器占据的总字节数
+        uint32_t *vaddr;                //mmap的首地址
+        uint32_t fb_id;                 //创建的framebuffer的id号
+        struct drm_mode_create_dumb create ;    //创建的dumb
+        struct drm_mode_map_dumb map;                   //内存映射结构体
+};
+
+struct property_crtc {
+        uint32_t blob_id;
+        uint32_t property_crtc_id;
+        uint32_t property_mode_id;
+        uint32_t property_active;
+};
+
+drmModeConnector *conn; //connetor相关的结构体
+drmModeRes *res;                //资源
+drmModePlaneRes *plane_res;
+
+int fd;                                 //文件描述符
+uint32_t conn_id;
+uint32_t crtc_id;
+uint32_t plane_id[3];
+
+#define RED 0XFF0000
+#define GREEN 0X00FF00
+#define BLUE 0X0000FF
+
+
+uint32_t color_table[6] = {RED,GREEN,BLUE,RED,GREEN,BLUE};
+
+struct drm_device buf;
+struct property_crtc pc;
+
+static int drm_create_fb(struct drm_device *bo)
+{
+        /* create a dumb-buffer, the pixel format is XRGB888 */
+        bo->create.width = bo->width;
+        bo->create.height = bo->height;
+        bo->create.bpp = 32;
+
+        /* handle, pitch, size will be returned */
+        drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &bo->create);
+
+        /* bind the dumb-buffer to an FB object */
+        bo->pitch = bo->create.pitch;
+        bo->size = bo->create.size;
+        bo->handle = bo->create.handle;
+        drmModeAddFB(fd, bo->width, bo->height, 24, 32, bo->pitch,
+                           bo->handle, &bo->fb_id);
+
+        //每行占用字节数，共占用字节数，MAP_DUMB的句柄
+        printf("pitch = %d ,size = %d, handle = %d \n",bo->pitch,bo->size,bo->handle);
+
+        /* map the dumb-buffer to userspace */
+        bo->map.handle = bo->create.handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &bo->map);
+
+        bo->vaddr = mmap(0, bo->create.size, PROT_READ | PROT_WRITE,
+                        MAP_SHARED, fd, bo->map.offset);
+
+        /* initialize the dumb-buffer with white-color */
+        memset(bo->vaddr, 0xff,bo->size);
+
+        return 0;
+}
+
+static void drm_destroy_fb(struct drm_device *bo)
+{
+        struct drm_mode_destroy_dumb destroy = {};
+        drmModeRmFB(fd, bo->fb_id);
+        munmap(bo->vaddr, bo->size);
+        destroy.handle = bo->handle;
+        drmIoctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
+}
+
+static uint32_t get_property(int fd, drmModeObjectProperties *props)
+{
+        drmModePropertyPtr property;
+        uint32_t i, id = 0;
+
+        for (i = 0; i < props->count_props; i++) {
+                property = drmModeGetProperty(fd, props->props[i]);
+                printf("\"%s\"\t\t---",property->name);
+                printf("id = %d , value=%ld\n",props->props[i],props->prop_values[i]);
+        }
+    return 0;
+}
+
+static uint32_t get_property_id(int fd, drmModeObjectProperties *props,
+                                const char *name)
+{
+        drmModePropertyPtr property;
+        uint32_t i, id = 0;
+
+
+        /* find property according to the name */
+        for (i = 0; i < props->count_props; i++) {
+                property = drmModeGetProperty(fd, props->props[i]);
+                if (!strcmp(property->name, name))
+                        id = property->prop_id;
+                drmModeFreeProperty(property);
+
+                if (id)
+                        break;
+        }
+
+        return id;
+}
+
+int drm_init()
+{
+        int i;
+
+        drmModeObjectProperties *props;
+        drmModeAtomicReq *req;
+
+        fd = open("/dev/dri/card0", O_RDWR | O_CLOEXEC);
+
+        res = drmModeGetResources(fd);
+        crtc_id = res->crtcs[0];
+        conn_id = res->connectors[0];
+
+        drmSetClientCap(fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
+        plane_res = drmModeGetPlaneResources(fd);
+        for(i=0;i<3;i++){
+                plane_id[i] = plane_res->planes[i];
+                printf("planes[%d]= %d\n",i,plane_id[i]);
+        }
+
+        conn = drmModeGetConnector(fd, conn_id);
+        buf.width = conn->modes[1].hdisplay;
+        buf.height = conn->modes[1].vdisplay;
+        drm_create_fb(&buf);
+
+        drmSetClientCap(fd, DRM_CLIENT_CAP_ATOMIC, 1);
+
+        /* get connector properties */
+        props = drmModeObjectGetProperties(fd, conn_id, DRM_MODE_OBJECT_CONNECTOR);
+        printf("/-----conn_Property-----/\n");
+        get_property(fd, props);
+        printf("\n");
+        pc.property_crtc_id = get_property_id(fd, props, "CRTC_ID");
+        drmModeFreeObjectProperties(props);
+
+        /* get crtc properties */
+        props = drmModeObjectGetProperties(fd, crtc_id, DRM_MODE_OBJECT_CRTC);
+        printf("/-----CRTC_Property-----/\n");
+        get_property(fd, props);
+        printf("\n");
+        pc.property_active = get_property_id(fd, props, "ACTIVE");
+        pc.property_mode_id = get_property_id(fd, props, "MODE_ID");
+        drmModeFreeObjectProperties(props);
+
+        /* create blob to store current mode, and retun the blob id */
+        drmModeCreatePropertyBlob(fd, &conn->modes[1],
+                                sizeof(conn->modes[1]), &pc.blob_id);
+
+        /* start modeseting */
+        req = drmModeAtomicAlloc();
+        drmModeAtomicAddProperty(req, crtc_id, pc.property_active, 1);
+        drmModeAtomicAddProperty(req, crtc_id, pc.property_mode_id, pc.blob_id);
+        drmModeAtomicAddProperty(req, conn_id, pc.property_crtc_id, crtc_id);
+        drmModeAtomicCommit(fd, req, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+        drmModeAtomicFree(req);
+}
+
+int drm_exit()
+{
+        drm_destroy_fb(&buf);
+        drmModeFreeConnector(conn);
+        drmModeFreePlaneResources(plane_res);
+        drmModeFreeResources(res);
+        close(fd);
+}
+
+int main(int argc, char **argv)
+{
+        int i,j;
+        drm_init();
+        //显示三色
+        for(j=0;j<3;j++){
+                for(i =j*buf.width*buf.height/3;i< (j+1)*buf.width*buf.height/3;i++)
+                        buf.vaddr[i] = color_table[j];
+        }
+        //1：1设置屏幕，没有该函数不会显示画面
+        drmModeSetPlane(fd, plane_id[0], crtc_id, buf.fb_id, 0,
+                        0, 0, buf.width, buf.height,
+                        0 << 16, 0 << 16, buf.width << 16, buf.height << 16);
+
+        getchar();
+        //将framebuffer上2/3的区域放到图层一上，
+        //此时屏幕改变，将的framebuffer区域拉伸到整个屏幕中
+        drmModeSetPlane(fd, plane_id[0], crtc_id, buf.fb_id, 0,
+                        0, 0, buf.width, buf.height,
+                        0 << 16, 0 << 16, buf.width << 16, buf.height/3*2 << 16);
+
+        getchar();
+        //将framebuffer区域缩放一倍放到图层二上，把图层二的位置放到屏幕的下方
+        //叠加在图层一上，可以看到图层二覆盖了图层一的部分区域
+        drmModeSetPlane(fd, plane_id[1], crtc_id, buf.fb_id, 0,
+                        buf.width/4, buf.height/2, buf.width/2, buf.height/2,
+                        0 << 16, 0 << 16, buf.width << 16, buf.height << 16);
+
+        getchar();
+
+        drm_exit();
+
+        return 0;
+}
+```
+
+
 
 
 
@@ -7409,3 +8907,32 @@ E: Unable to locate package neofetch
     ```
 
     若文件缺失以上三行源，复制粘贴到文件后面后保存退出，使用 apt 再次尝试安装。
+
+
+
+### DRM-legacy驱动屏幕无法显示
+
+- [x] 2024.11.05
+
+所用屏幕为 [7寸 IPS 1024x600 电容触摸屏](http://e.tb.cn/h.gARvAkdGxPZ7e7H?tk=3zll3Kkdwso)。
+
+最初在 `drm_init()` 中代码如下：
+
+```c
+buf.width = conn->modes[0].hdisplay;
+buf.height = conn->modes[0].vdisplay;
+...
+drmModeSetCrtc(fd, crtc_id, buf.fb_id, 0, 0, &conn_id, 1, &conn->modes[0]);
+```
+
+所用的 `mode` 为 `mode[0]`，其格式为 1024x600 屏幕无法正常显示，后更改为 `mode[1]`，其格式为 1920x1080，屏幕可正常显示。
+
+原因可能如下：
+
+HDMI 屏幕的分辨率支持取决于设备的硬件能力和显示器的兼容性。
+
+1. **显示器的原生分辨率**：一些显示器只支持特定的原生分辨率，比如 1920x1080。设置为 1024x600 时，显示器可能无法正确显示图像，甚至拒绝此模式。
+2. **显卡与驱动的支持**：显卡或其驱动程序对某些分辨率的支持不够稳定或完善，可能默认优先更高的分辨率。
+3. **HDMI 兼容性**：HDMI 协议在某些模式下可能存在特定的限制或问题，而 1920x1080 是广泛支持的标准模式，因此更可能成功显示。
+
+如遇到分辨率兼容问题，选择显示器原生或 HDMI 标准模式（如 1920x1080）通常能保证更高的兼容性和稳定性。
