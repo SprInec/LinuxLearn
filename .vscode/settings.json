@@ -4,6 +4,12 @@
         "select.h": "c",
         "xf86drm.h": "c",
         "xf86drmmode.h": "c",
-        "drm.h": "c"
-    }
+        "drm.h": "c",
+        "stdlib.h": "c",
+        "stdio.h": "c",
+        "types.h": "c",
+        "unistd.h": "c"
+    },
+    "typescript.preferGoToSourceDefinition": false,
+    "javascript.preferGoToSourceDefinition": false
 }
