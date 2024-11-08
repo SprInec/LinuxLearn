@@ -8547,7 +8547,7 @@ result = system("ls -l &");
 
 在前面了解到，`init` 进程可以启动一个子进程，它通过 `fork()` 函数从原程序中创建一个完全分离的子进程，当然，这只是 `init` 进程启动子进程的第一步，后续还有其他操作的。不管怎么说，`fork()` 函数的基础功能就是启动一个子进程，其示意图具体见 `fork` 示意图。
 
-<img src=".assets/image-20241108191447665.png" alt="image-20241108191447665" style="zoom: 67%;" />
+<img src=".assets/image-20241108191447665.png" alt="image-20241108191447665" style="zoom: 80%;" />
 
 在父进程中的 `fork()` 调用后返回的是新的子进程的 PID。新进程将继续执行，就像原进程一样，不同之处在于，子进程中的 `fork()` 函数调用后返回的是 0，父子进程可以通过返回的值来判断究竟谁是父进程，谁是子进程。
 
@@ -8729,7 +8729,7 @@ int main(void)
 
 **exec 族的其它函数**
 
-exec 族实际包含有6 个不同的 `exec` 函数，它们功能一样，主要是传参的形式不同，函数原型分别如下：
+exec 族实际包含有6 个不同的 `exec` 函数，依赖于头文件 `#include <unistd>` ，它们功能一样，主要是传参的形式不同，函数原型分别如下：
 
 ```c
 int execl(const char *path, const char *arg, ...)
@@ -8751,6 +8751,219 @@ int execve(const char *path, char *const argv[], char *const envp[])
 - 名称包含 `p` 字母的函数（`execvp` 和 `execlp`）可接受一个程序名作为参数，它会在当前的执行路径和环境变量 `PATH` 中搜索并执行这个程序（即可使用相对路径）；名字不包含 `p` 字母的函数在调用时必须指定程序的完整路径（即要求绝对路径）。
 - 名称包含 `v` 字母的函数（`execv`、`execvp` 和 `execve`）的子程序参数通过一个数组 `vector` 装载。
 - 名称包含 `e` 字母的函数（`execve` 和 `execle`）比其它函数多接收一个指明环境变量列表的参数，并且可以通过参数 `envp` 传递字符串数组作为新程序的环境变量，这个 `envp` 参数的格式应为一个以 NULL 指针作为结束标记的字符串数组，每个字符串应该表示为 `environment = virables` 的形式。
+
+在 Linux 中使用 `exec` 函数族主要有两种情况。
+
+1. 当进程认为自己不能再为系统和用户做出任何贡献时， 就可以调用 `exec` 函数族中的任意一个函数让自己重生。
+
+2. 如果一个进程想执行另一个程序，那么它就可以调用 `fork()` 函数新建一个进程，然后调用 `exec` 函数族中的任意一个函数，这样看起来就像通过执行应用程序而产生了一个新进程（这种情况非常普遍）。
+
+#### 28.7 终止进程
+
+在 Linux 系统中，进程终止（或者称为进程退出，为了统一，下文均使用 “终止” 一词）的常见方式有 5 种，可以分为正常终止与异常终止：
+
+**正常终止**
+
+- 从 main 函数返回。
+- 调用 `exit()` 函数终止。
+- 调用 `_exit()` 函数终止。
+
+**异常终止**
+
+- 调用 `abort()` 函数异常终止。
+- 由系统信号终止。
+
+在 Linux 系统中，`exit()` 函数定义在 `stdlib.h` 中，而 `_exit()` 定义在 `unistd.h` 中，`exit()` 和 `_exit()` 函数都是用来终止进程的，当程序执行到 `exit()` 或 `_exit()` 函数时，进程会无条件地停止剩下的所有操作，清除包括 PCB 在内的各种数据结构，并终止当前进程的运行。不过这两个函数还是有区别的，具体下图所示。
+
+<img src=".assets/image-20241108215001012.png" alt="image-20241108215001012" style="zoom: 80%;" />
+
+从图中可以看出，`_exit()` 函数的作用最为简单：直接通过系统调用使进程终止运行，当然，在终止进程的时候会清除这个进程使用的内存空间，并销毁它在内核中的各种数据结构；而 `exit()` 函数则在这些基础上做了一些包装，在执行退出之前加了若干道工序：比如 `exit()` 函数在调用 `exit` 系统调用之前要检查文件的打开情况，把文件缓冲区中的内容写回文件，这就是 “清除I/O 缓冲”。
+
+由于在 Linux 的标准函数库中，有一种被称作 “缓冲I/O（buffered I/O）” 操作，其特征就是对应每一个打开的文件，在内存中都有一片缓冲区。每次读文件时，会连续读出若干条记录，这样在下次读文件时就可以直接从内存的缓冲区中读取；同样，每次写文件的时候，也仅仅是写入内存中的缓冲区，等满足了一定的条件（如达到一定数量或遇到特定字符等），再将缓冲区中的内容一次性写入文件。
+
+这种技术大大增加了文件读写的速度，但也为编程带来了一些麻烦。比如有些数据，程序认为已经被写入文件中，实际上因为没有满足特定的条件，它们还只是被保存在缓冲区内，这时用 `_exit()` 函数直接将进程关闭，缓冲区中的数据就会丢失。因此，若想保证数据的完整性，就一定要使用 `exit()` 函数。
+
+不管是那种退出方式，系统最终都会执行内核中的同一代码，这段代码用来关闭进程所用已打开的文件描述符，释放它所占用的内存和其他资源。
+
+下面一起看看 `_exit()` 与 `exit()` 函数的使用方法：
+
+**头文件：**
+
+```c
+#include <unistd.h>
+#include <stdlib.h>
+```
+
+**函数原型：**
+
+```c
+void _exit(int status);
+void exit(int status);
+```
+
+这两个函数都会传入一个参数 `status`，这个参数表示的是进程终止时的状态码，0 表示正常终止，其他非 0 值表示异常终止，一般都可以使用 -1 或者1 表示，标准 C 里有 `EXIT_SUCCESS` 和 `EXIT_FAILURE` 两个宏，表示正常与异常终止。
+
+这些函数的使用都是非常简单的，只需要在需要终止的地方调用一下即可，此处就不深入讲解。
+
+#### 28.8 等待进程
+
+在 Linux 中，当我们使用 `fork()` 函数启动一个子进程时，子进程就有了它自己的生命周期并将独立运行，在某些时候，可能父进程希望知道一个子进程何时结束，或者想要知道子进程结束的状态，甚至是等待着子进程结束，那么我们可以通过在父进程中调用 `wait()` 或者 `waitpid()` 函数让父进程等待子进程的结束。
+
+从前面的文章我们也了解到，当一个进程调用了 `exit()` 之后，该进程并不会立刻完全消失，而是变成了一个僵尸进程。僵尸进程是一种非常特殊的进程，它已经放弃了几乎所有的内存空间，没有任何可执行代码，也不能被调度，仅仅在进程列表中保留一个位置，记载该进程的退出状态等信息供其他进程收集，除此之外，僵尸进程不再占有任何内存空间。那么无论如何，父进程都要回收这个僵尸进程，因此调用 `wait()` 或者 `waitpid()` 函数其实就是将这些僵尸进程回收，释放僵尸进程占有的内存空间，并且了解一下进程终止的状态信息。
+
+##### 28.8.1 wait() 函数
+
+`wait()` 函数原型如下：
+
+```c
+pid_t wait(int *wstatus);
+```
+
+`wait()` 函数在被调用的时候，系统将暂停父进程的执行，直到有信号来到或子进程结束，如果在调用 `wait()` 函数时子进程已经结束，则会立即返回子进程结束状态值。子进程的结束状态信息会由参数 `wstatus` 返回，与此同时该函数会返子进程的 PID，它通常是已经结束运行的子进程的 PID。状态信息允许父进程了解子进程的退出状态，如果不在意子进程的结束状态信息，则参数 `wstatus` 可以设成 NULL。
+
+`wait()` 函数有几点需要注意的地方：
+
+- `wait()` 要与 `fork()` 配套出现，如果在使用 `fork()` 之前调用 `wait()`，`wait()` 的返回值则为 -1，正常情况下 `wait()` 的返回值为子进程的 PID。
+- 参数 `wstatus` 用来保存被收集进程退出时的一些状态，它是一个指向 `int` 类型的指针，但如果我们对这个子进程是如何死掉毫不在意，只想把这个僵尸进程消灭掉，（事实上绝大多数情况下，我们都会这样做），我们就可以设定这个参数为 NULL。
+
+当然，Linux 系统提供了关于等待子进程退出状态的一些宏定义，我们可以使用这些宏定义来直接判断子进程退出的状态：
+
+- WIFEXITED(status) ：如果子进程正常结束，返回一个非零值
+- WEXITSTATUS(status)：如果 WIFEXITED 非零，返回子进程退出码
+- WIFSIGNALED(status) ：子进程因为捕获信号而终止，返回非零值
+- WTERMSIG(status) ：如果 WIFSIGNALED 非零，返回信号代码
+- WIFSTOPPED(status)：如果子进程被暂停，返回一个非零值
+- WSTOPSIG(status)：如果 WIFSTOPPED 非零，返回一个信号代码
+
+##### 28.8.2 wait() 实验
+
+```c
+// base_linux/system_programing/wait/sources/wait.c
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main(void)
+{
+    pid_t pid, child_pid;
+    int status;
+
+    pid = fork();
+
+    if (pid < 0) {
+        printf("Error fork!\n");
+    }
+    /* 子进程 */
+    else if (pid == 0) {
+        printf("I am a child process!\nmy pid is %d\n\n", getpid());
+        /* 子进程休眠3秒 */
+        sleep(3);
+
+        printf("I am about to quit the process!\n\n");
+
+        /* 子进程退出 */
+        exit(0);
+    }
+    /* 父进程 */
+    else {
+        /* 等待子进程退出, 父进程阻塞 */
+        child_pid = wait(&status);
+
+        if (child_pid == pid) {
+            printf("Get exit child process id: %d\n", child_pid);
+            printf("Get child exit status: %d\n\n", status);
+        } else {
+            printf("Some error occurred!\n\n");
+        }
+
+        exit(0);
+    }
+}
+```
+
+- 首先调用 `fork()`  函数启动一个子进程。
+- 如果 `fork()` 函数返回的值 pid 为0，则表示此时运行的是子进程，那么就让子进程输出一段信息，并且休眠 3 秒。
+- 休眠结束后调用 `exit()` 函数退出，退出状态为 0，表示子进程正常退出。
+- 如果 `fork()` 函数返回的值 pid 不为0，则表示此时运行的是父进程，那么在父进程中调用 `wait(&status)` 函数等待子进程的退出，子进程的退出状态将保存在 `status` 变量中。
+- 若发现子进程退出（通过 `wait()` 函数返回的子进程 pid 判断），则打印出相应信息，如子进程的 `pid` 与`status`。
+
+##### 28.8.3 waitpid()
+
+`waitpid()` 函数的作用和 `wait()` 函数一样，但它并不一定要等待第一个终止的子进程，它还有其他选项，比如指定等待某个 pid 的子进程、提供一个非阻塞版本的 `wait()` 功能等。实际上 `wait()` 函数只是 `waitpid()` 函数的一个特例，在 Linux 内部实现 wait 函数时直接调用的就是 waitpid 函数。
+
+函数原型：
+
+```c
+pid_t waitpid(pid_t pid, int *wstatus, int options);
+```
+
+`waitpid()` 函数的参数有 3 个，下面就简单介绍这些参数相关的选项：
+
+- `pid` : 参数 `pid` 为要等待的子进程 ID，其具体含义如下：
+    - `pid < -1`：等待进程组号为 pid 绝对值的任何子进程。
+    - `pid = -1`：等待任何子进程，此时的 `waitpid()` 函数就等同于 `wait()` 函数。
+    - `pid = 0`：等待进程组号与目前进程相同的任何子进程，即等待任何与调用 `waitpid()` 函数的进程在同一个进程组的进程。
+    - `pid > 0`：等待指定进程号为 `pid` 的子进程。
+- `wstatus`：与 `wait()` 函数一样。
+- `options`：参数 `options` 提供了一些另外的选项来控制 `waitpid()` 函数的行为。如果不想使用这些选项，则可以把这个参数设为 0。
+    - WNOHANG：如果 pid 指定的子进程没有终止运行，则 `waitpid()` 函数立即返回 0，而不是阻塞在这个函数上等待；如果子进程已经终止运行，则立即返回该子进程的进程号与状态信息。
+    - WUNTRACED：如果子进程进入了暂停状态（可能子进程正处于被追踪等情况），则马上返回。
+- WCONTINUED：如果子进程恢复通过 SIGCONT 信号运行，也会立即返回（这个不常用，了解一下即可）。
+
+很显然，当 `waitpid()` 函数的参数为 ( 子进程 pid, status,0 ) 时，`waitpid()` 函数就完全退化成了 `wait()` 函数。
+
+```c
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+int main()
+{
+    pid_t pid, child_pid;
+    int status;
+
+    pid = fork();
+
+    if (pid < 0) {
+        printf("Error fork\n");
+    }
+    /*子进程*/
+    else if (pid == 0) {
+
+        printf("I am a child process!, my pid is %d!\n\n",getpid());
+
+        /*子进程暂停 3s*/
+        sleep(3);
+
+        printf("I am about to quit the process!\n\n");
+        /*子进程正常退出*/
+        exit(0);
+    }
+    /*父进程*/
+    else {
+
+        /*
+            调用 waitpid，且父进程不阻塞，
+            options设置为0的话将与wait示例完全一致 
+        */
+        child_pid = waitpid(pid, &status, WUNTRACED);
+
+        /*若发现子进程退出，打印出相应情况*/
+        if (child_pid == pid) {
+            printf("Get exit child process id: %d\n",child_pid);
+            printf("Get child exit status: %d\n\n",status);
+        } else {
+            printf("Some error occured.\n");
+        }
+
+        exit(0);
+    }
+}
+```
 
 
 
