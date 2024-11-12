@@ -1,6 +1,9 @@
-# README
+---
+author: SprInec
+brief: Linux Learning record document
+---
 
- Linux learning record.
+# README
 
 [TOC]
 
@@ -11,29 +14,33 @@
 - **虚拟机软件**：VMWare Workstation 17 Pro
     - **虚拟机系统**：Ubuntu 20.04
 
-- **远程登陆工具**：Tabby 1.0.215
+- **远程登陆工具**：Tabby 1.0.215 / Visual Studio Code - Remote SSH
+
 - **IDE**：Visual Studio Code
+
 - **Markdown 编辑工具**：Typora 1.9.5
+
 - **版本控制系统**：Git
+
 - **代码托管平台**：GitHub
 
 - **Linux 开发板**：LubanCat 4
 
-    <img src=".assets/image-20241019134854554.png" alt="image-20241019134854554" style="zoom: 25%;" />
+    <img src=".assets/image-20241019134854554.png" alt="image-20241019134854554" style="zoom: 67%;" />
 
     - **核心**：Rockchip RK3588S
 
-    - **装载系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
+    - **装载系统**：Debian GNU/Linux 11 (bullseye) aarch64 (kernel : 5.10.198-rk3588)
 
     - **硬件标注**：
 
         - 正面视图
 
-        <img src=".assets/image-20241019135758100.png" alt="image-20241019135758100" style="zoom: 33%;" />
+        <img src=".assets/image-20241019135758100.png" alt="image-20241019135758100" style="zoom: 67%;" />
 
         - 背面视图
 
-        <img src=".assets/image-20241019135831061.png" alt="image-20241019135831061" style="zoom:33%;" />
+        <img src=".assets/image-20241019135831061.png" alt="image-20241019135831061" style="zoom: 67%;" />
 
 
 
@@ -220,7 +227,9 @@ cp -Rf /home/database/* /mnt/hgfs/LinuxLearn
 >
 > **使用板卡：** LubanCat 4 RK3588S
 >
-> **系统** ：Debian 11 ( kernel : 5.10.198-rk3588 ) 
+> **板卡系统：** Debian 11 ( kernel : 5.10.198-rk3588 ) 
+>
+> **PC 系统：** Windows 11
 
 ### 1. 配置网络
 
@@ -1146,9 +1155,9 @@ git push -u origin master
 git push -u origin main
 ```
 
-> **:bulb: NOTE**
+> [!TIP]
 >
-> **1. 首次推送到新的远程分支：** 可以使用 `git push -u origin <分支名>`，这样会创建本地分支与远程分支之间的跟踪关系。
+> **1首次推送到新的远程分支：** 可以使用 `git push -u origin <分支名>`，这样会创建本地分支与远程分支之间的跟踪关系。
 >
 > ```bash
 > git push -u origin feature-branch
@@ -1549,7 +1558,7 @@ gcc hello_arg.c -o hello_arg
 
 ![image-20241017220546347](.assets/image-20241017220546347.png)
 
-> :warning:**NOTICE​**
+> [!NOTE]
 >
 > 输入的参数都是以字符串的形式保存，如果输入数字的话，需要字符串转成数字类型才能使用
 
@@ -3389,7 +3398,7 @@ $$
 32 * 1 + 0 * 8 + 4 = 36
 $$
 
-> :warning: **NOTICE**
+> [!CAUTION]
 >
 > 并不是所有的引脚都能通过 `export` 文件导出到用户空间的，在使用的引脚是不能被导出的
 >
@@ -3630,7 +3639,7 @@ sudo apt install gpiod
 |  gpioget   | 获取 gpio 引脚状态         |    gpioget 1 4     | 获取第一组控制器编号 4 的引脚状态   |
 |  gpiomon   | 监控 gpio 的状态           |    gpiomon 1 4     | 监控第一组控制器编号 4 的引脚状态   |
 
-> **:small_red_triangle_down:IMPORTANT**
+> [!IMPORTANT]
 >
 > Rockchip Pin 的 ID 按照控制器 ( bank ) + 端口 ( port ) + 索引序号 ( pin ) 组成。其中端口号和索引号会合并成一个数值传入到 gpiod 里去并不是所有的引脚都能够使用 libgpiod 控制，例如 led 之类的一些已经被使用的引脚。
 
@@ -4918,7 +4927,7 @@ __tcgetattr (int fd, struct termios *termios_p)
 
 #### 16.1 I2C 通讯协议简介
 
-I2C 通讯协议 ( Inter － Integrated Circuit ) 是由 Phiilps 公司开发的，由于它**引脚少，硬件实现简单，可扩展性强，不需要 USART、CAN 等通讯协议的外部收发设备**，被广泛地使用在多个集成电路 ( IC ) 间的通讯。
+I2C 通讯协议 ( Inter － Integrated Circuit ) 是由 Phiilps 公司开发的，由于它==引脚少，硬件实现简单，可扩展性强，不需要 USART、CAN 等通讯协议的外部收发设备==，被广泛地使用在多个集成电路 ( IC ) 间的通讯。
 
 ##### 16.1.1 I2C 物理层
 
@@ -4964,15 +4973,15 @@ I2C 通讯过程的基本结构，它的通讯过程常有如下三种方式：
 
 写数据方向：
 
-若配置的方向传输位为 “ 写数据 ” 方向，即第一幅图的情况，广播完地址，接收到应答信号后，主机开始正式向从机传输数据 ( DATA ) ，**数据包的大小为 8 位，主机每发送完一个字节数据，都要等待从机的应答信号 ( ACK )，重复这个过程，可以向从机传输 N 个数据，这个 N 没有大小限制**。当数据传输结束时，主机向从机发送一个停止传输信号( P )，表示不再传输数据。
+若配置的方向传输位为 “ 写数据 ” 方向，即第一幅图的情况，广播完地址，接收到应答信号后，主机开始正式向从机传输数据 ( DATA ) ，==数据包的大小为 8 位，主机每发送完一个字节数据，都要等待从机的应答信号 ( ACK )，重复这个过程，可以向从机传输 N 个数据，这个 N 没有大小限制==。当数据传输结束时，主机向从机发送一个停止传输信号( P )，表示不再传输数据。
 
 读数据方向：
 
-若配置的方向传输位为 “ 读数据 ” 方向，即第二幅图的情况，广播完地址，接收到应答信号后，从机开始向主机返回数据 ( DATA ) ，数据包大小也为 8 位，从机每发送完一个数据，都会等待主机的应答信号 ( ACK )，重复这个过程，可以返回 N 个数据，这个 N 也没有大小限制。当**主机希望停止接收数据时，就向从机返回一个非应答信号(NACK)，则从机自动停止数据传输。**
+若配置的方向传输位为 “ 读数据 ” 方向，即第二幅图的情况，广播完地址，接收到应答信号后，从机开始向主机返回数据 ( DATA ) ，数据包大小也为 8 位，从机每发送完一个数据，都会等待主机的应答信号 ( ACK )，重复这个过程，可以返回 N 个数据，这个 N 也没有大小限制。==当主机希望停止接收数据时，就向从机返回一个非应答信号(NACK)，则从机自动停止数据传输。==
 
 复合格式：
 
-除了基本的读写，I2C 通讯更常用的是复合格式，即第三幅图的情况，该传输过程有**两次起始信号 ( S )** 。一般在第一次传输中，主机通过 SLAVE_ADDRESS 寻找到从设备后，发送一段 “ 数据 ”，这段数据通常用于表示从设备内部的寄存器或存储器地址 ( 注意区分它与 SLAVE_ADDRESS 的区别 )；在第二次的传输中，对该地址的内容进行读或写。也就是说，**第一次通讯是告诉从机读写地址，第二次则是读写的实际内容。**
+除了基本的读写，I2C 通讯更常用的是复合格式，即第三幅图的情况，该传输过程有==两次起始信号 ( S )== 。一般在第一次传输中，主机通过 SLAVE_ADDRESS 寻找到从设备后，发送一段 “ 数据 ”，这段数据通常用于表示从设备内部的寄存器或存储器地址 ( 注意区分它与 SLAVE_ADDRESS 的区别 )；在第二次的传输中，对该地址的内容进行读或写。也就是说，==第一次通讯是告诉从机读写地址，第二次则是读写的实际内容。==
 
 以上通讯流程中包含的起始、停止、数据有效性、地址和数据方向以及响应的说明按小节如下。
 
@@ -6041,7 +6050,7 @@ RGB555: | RRRRRGGG|GGGBBBBB|
 
 #### 22.2 framebuffer 应用程序
 
-> **NOTE** 
+> [!NOTE]
 >
 > 如果使用的是带桌面版的镜像，在使用 framebuffer 前要注意先把图形界面关闭，不然会出现触摸后屏幕不断闪烁的情况。
 
@@ -6319,7 +6328,7 @@ gcc -o framebuffer framebuffer.c
     与之相对应的是第 64 行的 `munmap(fb_mem,var.xres*var.yres*4)` ;
 
     ```c
-    # 函数功能：释放内存空间
+    // 函数功能：释放内存空间
     int munmap(void *addr, size_t length);
     ```
 
@@ -6360,7 +6369,7 @@ gcc -o framebuffer framebuffer.c
         memset(fb_mem, 0x00, var.xres * var.yres * 4);
     ```
 
-    该操作就可以直接通过操作 framebuffer 就可以控制屏幕了。i 对应的数值就是屏幕中像素点的位置。
+    该操作就可以直接通过操作 framebuffer 就可以控制屏幕了。`i` 对应的数值就是屏幕中像素点的位置。
 
 #### 22.3 双缓冲 framebuffer 设计
 
@@ -6376,7 +6385,7 @@ gcc -o framebuffer framebuffer.c
 
 <img src=".assets/image-20241104114957342.png" alt="image-20241104114957342" style="zoom:50%;" />
 
-以横向扩充为例
+以横向扩充为例。
 
 ##### 22.3.3 实现思路
 
@@ -6503,9 +6512,9 @@ RK3588 的板卡支持 4 屏异显
 sudo apt install libdrm-tests
 ```
 
-> **NOTE**
+> [!NOTE]
 >
-> 此处 libdrm-tests 的 modetest 组件与 rktoolkit 的 modetest 组件冲突，必须移除一个才可使用，这里放弃 libdrm-tests 的安装，使用 rktoolkit 的 modetest 进行 DRM 的测试分析。
+> 此处 `libdrm-tests` 的 modetest 组件与 rktoolkit 的 modetest 组件冲突，必须移除一个才可使用，这里放弃 libdrm-tests 的安装，使用 rktoolkit 的 modetest 进行 DRM 的测试分析。
 >
 > rktoolkit  是由 Rockchip 提供的一组工具，通常用于开发和调试基于 Rockchip 处理器（如 RK3399、RK3288 、RK3588 等）的嵌入式系统。这些工具可以帮助开发者在 Rockchip 的硬件平台上执行特定的操作，比如显示测试、驱动程序调试和硬件配置。
 
@@ -6773,7 +6782,9 @@ int main(int argc, char *argv[])
 }
 ```
 
-> **ERROR** - [**DRM-legacy驱动屏幕无法显示**](#DRM-legacy驱动屏幕无法显示)
+> [!WARNING]
+>
+> [**DRM-legacy驱动屏幕无法显示**](#DRM-legacy驱动屏幕无法显示)
 >
 > 最初在 `drm_init()` 中代码如下：
 >
@@ -6941,7 +6952,7 @@ int drm_init(void)
 
 ```c
 int drmModeSetCrtc(int fd, uint32_t crtcId, uint32_t bufferId,
-				   uint32_t x, uint32_t y, uint32_t *connectors, int count,
+				  uint32_t x, uint32_t y, uint32_t *connectors, int count,
                    drmModeModeInfoPtr mode);
 ```
 
@@ -7534,9 +7545,7 @@ int main(int argc, char **argv)
 
 **总结**：
 
-这两个方法各有各的好处，单 framebuffer 简单，写起来更快捷，适合于图像简单的场景，多 framebuffer
-复杂，但是扩展性更强，在多 framebuffer 的情况下，可以单独扩展每个 framebuffer 的大小，
-适合图像比较复杂的场景。
+这两个方法各有各的好处，单 framebuffer 简单，写起来更快捷，适合于图像简单的场景，多 framebuffer复杂，但是扩展性更强，在多 framebuffer 的情况下，可以单独扩展每个 framebuffer 的大小，适合图像比较复杂的场景。
 
 #### 24.3 页翻转
 
@@ -8356,6 +8365,8 @@ sudo apt install psmisc
 
 程序并不能单独执行，只有将程序加载到内存中，系统为它分配资源后才能够执行，这种正在执行的程序称之为进程，也就是说进程是系统进行资源分配和调度的一个独立单位，每个进程都有自己单独的地址空间。
 
+> [!NOTE]
+>
 > “ 程序” 和 “ 进程 ” 的关系类似 “ 类 ” 与 “ 对象 ”
 
 举个例子，我们可以看到 `/bin` 目录下有很多可执行文件，如下图所示，我们在系统中打开一个终端就是一个进程，这个进程由 `bash` 可执行文件（程序）实例化而来。而一个 Linux 系统可以打开多个终端，并且这些终端是独立运行在系统中的。
@@ -8721,7 +8732,7 @@ int main(void)
 
 ![image-20241108205925231](.assets/image-20241108205925231.png)
 
-> **NOTE**
+> [!NOTE]
 >
 > `exec` 系列函数是直接将当前进程给替换掉的，当调用 `exec` 系列函数后，当前进程将不会再继续执行，所以示例程序中的 “Done! ” 将不被输出，因为当前进程已经被替换了，一般情况下，`exec` 系列函数函数是不会返回的，除非发生了错误。出现错误时，`exec` 系列函数将返回 -1，并且会设置错误变量 `errno`。
 
@@ -9333,7 +9344,9 @@ kill - SIGHUP 666
 kill -1 666
 ```
 
-> 备注：这里的 -1 是指信号值为 1 的 SIGHUP 信号
+> [!NOTE]
+>
+> 这里的 -1 是指信号值为 1 的 SIGHUP 信号
 
 演示完 `kill` 命令，就来看看 Linux 系统中信号操作相关的函数，`kill()` 函数与 `kill` 系统命令一样，可以发送信号给进程或进程组，实际上，`kill` 系统命令只是 `kill()` 函数的一个用户接口。这里需要注意的是，它不仅可以中止进程（实际上发出 SIGKILL 信号），也可以向进程发送其他信号。
 
@@ -9651,7 +9664,7 @@ Linux 系统上的管道分两种类型：
 int pipe(int pipefd[2]);
 ```
 
-函数原型非常简单，没有任何的传入参数，注意：数组 `pipefd` 是用于返回两个引用管道末端的文件描述符，它是一个由两个文件描述符组成的数组的指针。**`pipefd[0]` 指管道的读取端，`pipefd[1]`指向管道的写端**，向管道的写入端写入数据将会由内核缓冲，即写入内存中，直到从管道的读取端读取数据为止，而且数据遵循先进先出原则。`pipe()` 函数还会返回一个 `int` 类型的变量，如果为  0 则表示创建匿名管道成功，如果为 -1 则表示创建失败，并且设置 errno。
+函数原型非常简单，没有任何的传入参数，注意：数组 `pipefd` 是用于返回两个引用管道末端的文件描述符，它是一个由两个文件描述符组成的数组的指针。**`pipefd[0]` 指管道的读取端，`pipefd[1]`指向管道的写端**，向管道的写入端写入数据将会由内核缓冲，即写入内存中，直到从管道的读取端读取数据为止，而且数据遵循先进先出原则。`pipe()` 函数还会返回一个 `int` 类型的变量，如果为 0 则表示创建匿名管道成功，如果为 -1 则表示创建失败，并且设置 errno。
 
 匿名管道创建成功以后，创建该匿名管道的进程（父进程）同时掌握着管道的读取端和写入端，但是想要父子进程间有数据交互，则需要以下操作：
 
@@ -9661,10 +9674,6 @@ int pipe(int pipefd[2]);
 - 如果想要从父进程将数据传递给子进程，则父进程需要关闭读取端，子进程关闭写入端，如图 *数据从父进程流向子进程* 所示。
 - 如果想要从子进程将数据传递给父进程，则父进程需要关闭写入端，子进程关闭读取端，如图 *数据从子进程流向父进程* 所示。
 - 当不需要管道的时候，就在进程中将未关闭的一端关闭即可。
-
-![image-20241109192859298](.assets/image-20241109192859298.png)
-
-
 
 ![image-20241109192905383](.assets/image-20241109192905383.png)
 
@@ -9985,15 +9994,14 @@ int main(void)
 
 FIFO 的应用场景是什么呢？
 
-一个典型应用是 Linux 的日志系统。系统的日志信息被统一安排存放在 `/var/log` 目录下，这些日志文件都是一些普通的文本文件，在 Linux 系统中普通的文件可以被一个或多个进程重读多次打开，每次打开都有一个独立的位置偏移量，如果多个进程或线程同时写文件，那么除非他们之间能相互协调好，否则必然导致混乱。可惜需要写日志的进程根本不可能“协调好”，由于写日志的进程是毫无关联的，因此常用的互斥手段(比如后面介绍的什么互斥锁、信号量等) 是无法起作用的，就像你无法试图通过交通法规来杜绝有人乱闯红灯一样，因为总有人可以故意无视规则，肆意践踏规则，如何使得毫不相干的不同进程的日志信息都能完整地输送到日志文件中而不相互破坏，是一个必须要解决的问题，一个简单高效的方案是：使用 FIFO 来接收各个不相干进程的日志信息，然后让一个进程专门将FIFO 中的数据写到相应的日志文件当中。这样做的好处是，任何进程无需对日志信息的互斥编写出任何额外的代
-码，只管往 FIFO 里面写入即可。后台默默耕耘的日志系统服务例程会将这些信息一一地拿出来再写入日志文件，FIFO 的写入原子性保证了数据的完整无缺而且不会错乱。
+一个典型应用是 Linux 的日志系统。系统的日志信息被统一安排存放在 `/var/log` 目录下，这些日志文件都是一些普通的文本文件，在 Linux 系统中普通的文件可以被一个或多个进程重读多次打开，每次打开都有一个独立的位置偏移量，如果多个进程或线程同时写文件，那么除非他们之间能相互协调好，否则必然导致混乱。可惜需要写日志的进程根本不可能“协调好”，由于写日志的进程是毫无关联的，因此常用的互斥手段(比如后面介绍的什么互斥锁、信号量等) 是无法起作用的，就像你无法试图通过交通法规来杜绝有人乱闯红灯一样，因为总有人可以故意无视规则，肆意践踏规则，如何使得毫不相干的不同进程的日志信息都能完整地输送到日志文件中而不相互破坏，是一个必须要解决的问题，一个简单高效的方案是：使用 FIFO 来接收各个不相干进程的日志信息，然后让一个进程专门将FIFO 中的数据写到相应的日志文件当中。这样做的好处是，任何进程无需对日志信息的互斥编写出任何额外的代码，只管往 FIFO 里面写入即可。后台默默耕耘的日志系统服务例程会将这些信息一一地拿出来再写入日志文件，FIFO 的写入原子性保证了数据的完整无缺而且不会错乱。
 
 ### 31. 消息队列
 
 Linux 下的进程通信手段基本上是从 Unix 平台上的进程通信手段继承而来的。而对 Unix 发展做出重大贡献的两大主力 AT&T 的贝尔实验室以及 BSD（加州大学伯克利分校的伯克利软件发布中心），他们在进程间通信方面的侧重点有所不同；
 
 - 前者对 Unix 早期的进程间通信手段进行了系统的改进和扩充，形成了 “system-V IPC”，通信进程局限在单个计算机内（同一个设备的不同进程间通讯）；
-- 而后者则跳过了该限制，形成了基于套接字（socket）的进程间通信机制（多用于不同设备的进程间通讯）。Linux 则把两者继承了下来，所以说 Linux 才是最成功的，既有“system-V IPC”，又支持 “socket”。
+- 而后者则跳过了该限制，形成了基于套接字（socket）的进程间通信机制（多用于不同设备的进程间通讯）。Linux 则把两者继承了下来，所以说 Linux 才是最成功的，既有 “system-V IPC”，又支持 “socket”。
 
 **消息队列、共享内存和信号量被统称为 system-V IPC** ，V 是罗马数字 5，是 Unix 的 AT&T 分支的其中一个版本，一般习惯称呼他们为 IPC 对象，这些对象的操作接口都比较类似，在系统中他们都使用一种叫做 key 的键值来唯一标识，而且他们都是 “持续性” 资源——即他们被创建之后，不会因为进程的退出而消失，而会持续地存在，除非调用特殊的函数或者命令删除他们。
 
@@ -10038,6 +10046,982 @@ Linux 内核提供了一系列函数来使用消息队列：
 - 接收消息使用的函数是 `msgrcv()`，它把消息从消息队列中取走，与 FIFO 不同的是，这里可以指定取走某一条消息;
 - 最后控制消息队列使用的函数是 `msgctl()`，它可以完成多项功能。
 
+##### 37.3.1 msgget() 获取函数
+
+收发消息前需要具体的消息队列对象，`msgget()` 函数的作用是创建或获取一个消息队列对象，并返回消息队列标识符。函数原型如下：
+
+```c
+int msgget(key_t key, int msgflg);
+```
+
+若执行成功返回队列 ID，失败返回 -1。它的两个输入参数说明如下：
+
+- `key` ：消息队列的关键字值，多个进程可以通过它访问同一个消息队列。例如收发进程都使用同一个键值即可使用同一个消息队列进行通讯。其中有个特殊值 IPC_PRIVATE，它用于创建当前进程的私有消息队列。
+
+- `msgflg` ：表示创建的消息队列的模式标志参数，主要有 IPC_CREAT，IPC_EXCL 和权限 `mode`：
+
+    - 如果是 IPC_CREAT 为真表示：如果内核中不存在关键字与 `key` 相等的消息队列，则新建一个消息队列；如果存在这样的消息队列，返回此消息队列的标识符。
+    - 而如果为 IPC_CREAT | IPC_EXCL 表示如果内核中不存在键值与 `key` 相等的消息队列，则新建一个消息队列；如果存在这样的消息队列则报错。
+    - `mode` 指 IPC 对象存取权限，它使用 Linux 文件的数字权限表示方式，如 0600，0666 等。
+
+    这些参数是可以通过 `｜` 运算符联合起来的，因为它始终是 int 类型的参数。如 `msgflag`使用参数 IPC_CREAT | 0666 时表示，创建或返回已经存在的消息队列的标识符，且该消息队列的存取权限为 0666，即消息的所有者，所属组用户，其他用户均可对该消息进行读写。
+    
+    > [!CAUTION]
+    >
+    > - 选项 `msgflg` 是一个位掩码，因此 IPC_CREAT、IPC_EXCL 和权限 `mode` 可以用位或的方式叠加起来，比如: `msgget(key, IPC_CREAT | 0666);` 表示如果 `key` 对应的消息队列不存在就创建，且权限指定为 0666，若已存在则直接获取消息队列 ID，此处的 0666 使用的是 Linux 文件权限的数字表示方式。
+    > - 权限只有读和写，执行权限是无效的，例如 0777 跟 0666 是等价的。
+    > - 当 `key` 被指定为 IPC_PRIVATE 时，系统会自动产生一个未用的 `key` 来对应一个新的消息队列对象，这个消息队列一般用于进程内部间的通信。
+
+- 该函数可能返回以下错误代码：
+    - EACCES：指定的消息队列已存在，但调用进程没有权限访问它
+    - EEXIST：`key` 指定的消息队列已存在，而 `msgflg` 中同时指定 IPC_CREAT 和IPC_EXCL 标志
+    - ENOENT：`key` 指定的消息队列不存在同时 `msgflg` 中没有指定 IPC_CREAT 标志
+    - ENOMEM：需要建立消息队列，但内存不足
+    - ENOSPC：需要建立消息队列，但已达到系统的限制
+
+#### 31.4 发送消息与接受消息
+
+##### 31.4.1 msgsnd() 发送函数
+
+这个函数的主要作用就是将消息写入到消息队列，俗称发送一个消息。函数原型如下：
+
+```c
+int msgsnd(int msqid, const void *msgp, size_t msgsz, int msgflg);
+```
+
+参数说明：
+
+- `msqid`：消息队列标识符。
+
+- `msgp`：发送给队列的消息。`msgp` 可以是任何类型的结构体，但第一个字段必须为 `long` 类型，即表明此发送消息的类型，`msgrcv()` 函数则根据此接收消息。`msgp` 定义的参照格式如下：
+
+    ```c
+    /*msgp 定义的参照格式*/
+    struct s_msg{
+    	long type;      /* 必须大于0, 消息类型*/
+    	char mtext[１]; /* 消息正文，可以是其他任何类型*/
+    } msgp;
+    ```
+
+    - `msgsz`：要发送消息的大小，不包含消息类型占用的 4 个字节，即 `mtext` 的长度。
+
+    - `msgflg`：如果为 0 则表示：当消息队列满时，`msgsnd()` 函数将会阻塞，直到消息能写进消息队列；如果为 IPC_NOWAIT 则表示：当消息队列已满的时候，`msgsnd()` 函数不等待立即返回；如果为 IPC_NOERROR：若发送的消息大于 `size` 字节，则把该消息截断，截断部分将被丢弃，且不通知发送进程。
+
+- 返回值：如果成功则返回 0，如果失败则返回 -1，并且错误原因存于 error 中。错误代码：
+    - EAGAIN：参数 `msgflg` 设为 IPC_NOWAIT，而消息队列已满。
+    - EIDRM：标识符为 `msqid` 的消息队列已被删除。
+    - EACCESS：无权限写入消息队列。
+    - EFAULT：参数 `msgp` 指向无效的内存地址。
+    - EINTR：队列已满而处于等待情况下被信号中断。
+    - EINVAL：无效的参数 `msqid`、`msgsz` 或参数消息类型 `type` 小于 0。
+
+`msgsnd()` 为阻塞函数，当消息队列容量满或消息个数满会阻塞。若消息队列已被删除，则返回 EIDRM 错误；若被信号中断返回 E_INTR 错误。
+
+如果设置 IPC_NOWAIT 消息队列满或个数满时会返回 -1，并且置 EAGAIN 错误。
+
+`msgsnd()` 解除阻塞的条件有以下三个条件：
+
+- 消息队列中有容纳该消息的空间。
+- `msqid` 代表的消息队列被删除。
+- 调用 `msgsnd` 函数的进程被信号中断。
+
+##### 31.4.2 msgrcv() 接收函数
+
+`msgrcv()` 函数是从标识符为 `msqid` 的消息队列读取消息并将消息存储到 `msgp` 中，读取后把此消息从消息队列中删除，也就是俗话说的接收消息。函数原型：
+
+```c
+ssize_t msgrcv(int msqid, void *msgp, size_t msgsz, long msgtyp, int msgflg);
+```
+
+参数说明：
+
+- `msqid`：消息队列标识符。
+- `msgp`：存放消息的结构体，结构体类型要与 `msgsnd()` 函数发送的类型相同。
+- `msgsz`：要接收消息的大小，不包含消息类型占用的 4 个字节。
+- `msgtyp` 有多个可选的值：如果为 0 则表示接收第一个消息，如果大于 0 则表示接收类型等于 `msgtyp` 的第一个消息，而如果小于 0 则表示接收类型等于或者小于 `msgtyp` 绝对值的第一个消息。
+
+- `msgflg` 用于设置接收的处理方式，取值情况如下：
+    - 0 : 阻塞式接收消息，没有该类型的消息 `msgrcv` 函数一直阻塞等待
+    - IPC_NOWAIT：若在消息队列中并没有相应类型的消息可以接收，则函数立即返回，此时错误码为 ENOMSG
+    - IPC_EXCEPT：与 `msgtype` 配合使用返回队列中第一个类型不为 `msgtype` 的消息
+    - IPC_NOERROR：如果队列中满足条件的消息内容大于所请求的 `size` 字节，则把该消息截断，截断部分将被丢弃
+
+- 返回值：`msgrcv()` 函数如果接收消息成功则返回实际读取到的消息数据长度，否则返回 -1，错误原因存于 error 中。错误代码：
+    - E2BIG：消息数据长度大于 `msgsz` 而 `msgflag` 没有设置 IPC_NOERROR
+    - EIDRM：标识符为 `msqid` 的消息队列已被删除
+    - EACCESS：无权限读取该消息队列
+    - EFAULT：参数 `msgp` 指向无效的内存地址
+    - ENOMSG：参数 `msgflg` 设为 IPC_NOWAIT，而消息队列中无消息可读
+    - EINTR：等待读取队列内的消息情况下被信号中断
+
+`msgrcv()` 函数解除阻塞的条件也有三个：
+
+- 消息队列中有了满足条件的消息。
+- `msqid` 代表的消息队列被删除。
+- 调用 `msgrcv()` 函数的进程被信号中断。
+
+##### 37.4.3 msgctl() 操作消息队列
+
+消息队列是可以被用户操作的，比如设置或者获取消息队列的相关属性，那么可以通过 `msgctl()` 函数去处理它。函数原型：
+
+```c
+int msgctl(int msqid, int cmd, struct msqid_ds *buf);
+```
+
+参数说明：
+
+- `msqid`：消息队列标识符。
+
+- `cmd` 用于设置使用什么操作命令，它的取值有多个：
+    - IPC_STAT 获取该 MSG 的信息，获取到的信息会储存在结构体 `msqid_ds` 类型的 `buf` 中。
+    - IPC_SET 设置消息队列的属性，要设置的属性需先存储在结构体 `msqid_ds` 类型的 `buf` 中，可设置的属性包括：`msg_perm.uid`、`msg_perm.gid`、`msg_perm.mode` 以及 `msg_qbytes`，储存在结构体 `msqid_ds` 中。
+    - IPC_RMID 立即删除该 MSG，并且唤醒所有阻塞在该 MSG 上的进程，同时忽略第三个参数。
+    - IPC_INFO 获得关于当前系统中 MSG 的限制值信息。
+    - MSG_INFO 获得关于当前系统中 MSG 的相关资源消耗信息。
+    - MSG_STAT 同 IPC_STAT，但 `msgid` 为该消息队列在内核中记录所有消息队列信息的数组的下标，因此通过迭代所有的下标可以获得系统中所有消息队列的相关信息。
+
+- `buf` ：相关信息结构体缓冲区。
+
+    返回值：
+
+    - 成功：0
+    - 出错：-1，错误原因存于 error 中，错误代码：
+        - EACCESS：参数 `cmd` 为 IPC_STAT，确无权限读取该消息队列。
+        - EFAULT：参数 `buf` 指向无效的内存地址。
+        - EIDRM：标识符为 `msqid` 的消息队列已被删除。
+        - EINVAL：无效的参数 `cmd` 或 `msqid`。
+        - EPERM：参数 `cmd` 为 IPC_SET 或 IPC_RMID，却无足够的权限执行。
+
+#### 31.5 消息队列示例
+
+接下来通过示例来讲解消息队列的使用，使用方法一般是:
+
+<u>发送者</u>：
+
+1. 获取消息队列的 ID
+2. 将数据放入一个附带有标识的特殊的结构体，发送给消息队列。
+
+<u>接收者</u>：
+
+1. 获取消息队列的 ID
+2. 将指定标识的消息读出。
+
+当发送者和接收者都不再使用消息队列时，及时删除它以释放系统资源。
+
+本次实验主要是两个进程（无血缘关系的进程）通过消息队列进行消息的传递，一个进程发送消息，一个进程接收消息，并将其打印出来。
+
+##### 31.5.1 发送进程
+
+```c
+// path: base_linux/system_programing/msg/msg_send/sources/msg.c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+#define BUFFER_SIZE 512
+
+struct message {
+    long msg_type;
+    char msg_text[BUFFER_SIZE];
+};
+
+int main(void)
+{
+    int qid;
+    struct message msg;
+
+    /* 创建消息队列 */
+    if ((qid = msgget((key_t)1234, IPC_CREAT | 0666)) == -1)
+    {
+        perror("msgget\n");
+        exit(1);
+    }
+
+    printf("Open queue %d\n", qid);
+
+    while(1)
+    {
+        printf("Enter some message to the queue:");
+        if ((fgets(msg.msg_text, BUFFER_SIZE, stdin)) == NULL)
+        {
+            printf("\nGet message end.\n");
+            exit(1);
+        }
+
+        msg.msg_type = getpid();
+
+        // 添加消息到消息队列
+        if ((msgsnd(qid, &msg, strlen(msg.msg_text), 0)) < 0)
+        {
+            perror("\nSend message error.\n");
+            exit(1);
+        }
+        else
+        {
+            printf("Send message.\n");
+        }
+
+        if (strncmp(msg.msg_text, "quit", 4) == 0)
+        {
+            printf("\nQuit get message.\n");
+            break;
+        }
+    }
+
+    exit(0);
+}
+```
+
+- 第 23 行，调用 `msgget()` 函数创建/获取了一个 `key` 值为 1234 的消息队列，该队列的属性 “0666” 表示任何人都可读写，创建/获取到的队列 ID 存储在变量 `qid` 中。
+
+- 第 47 行，调用 `msgsndb()` 函数把进程号以及前面用户输入的字符串，通过 `msg` 结构体添加到前面得到的 `qid` 队列中。
+
+- 第 51 行，若用户发送的消息为 `quit`，那么退出循环结束进程。
+
+```makefile
+# path: base_linux/system_programing/msg/msg_send/Makedile
+TARGET = msg_send
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
+```
+
+##### 31.5.2 接收进程
+
+```c
+// path: base_linux/system_programing/msg/msg_recv/sources/msg.c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/msg.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+
+#define BUFFER_SIZE 512
+
+struct message {
+    long msg_type;
+    char mes_text[BUFFER_SIZE];
+};
+
+int main(void)
+{
+    int qid;
+    struct message msg;
+
+    /* 创建消息队列 */
+    if ((qid = msgget((key_t)1234, IPC_CREAT|0666)) == -1)
+    {
+        perror("msgget");
+        exit(1);
+    }
+
+    printf("Open queue %d\n", qid);
+
+    do
+    {
+        /* 读消息队列 */
+        memset(msg.mes_text, 0, BUFFER_SIZE);
+
+        if (msgrcv(qid, (void*)&msg, BUFFER_SIZE, 0, 0) < 0)
+        {
+            perror("msgrcv");
+            exit(1);
+        }
+
+        printf("The message from process %ld : %s", msg.msg_type, msg.mes_text);
+    } while (strncmp(msg.mes_text, "quit", 4));
+
+    /* 从系统内核中删除消息队列 */
+    if ((msgctl(qid, IPC_RMID, NULL)) < 0)
+    {
+        perror("msgctl");
+        exit(1);
+    }
+    else
+    {
+        printf("Delete msg qid: %d.\n", qid);
+    }
+
+    exit(0);
+}
+```
+
+- 第 23 行，调用 `msgget()` 函数创建/获取队列 `qid`。可以注意到，此处跟发送进程是完全一样的，无论哪个进程先运行，若 `key` 值为 1234 的队列不存在则创建，把以实验时两个进程并没有先后启动顺序的要求。
+- 第 23 行，调用 `msgget()` 函数创建/获取队列 `qid`。可以注意到，此处跟发送进程是完全一样的，无论哪个进程先运行，若 key 值为 1234 的队列不存在则创建，把以实验时两个进程并没有先后启动顺序的要求。
+- 第 47 行，若前面接收到用户的消息为 `quit`，会退出循环，在本行代码调用 `msgctl()` 删除消息队列并退出本进程。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/system_programing/msg/msg_recv/Makedile
+TARGET = msg_recv
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
+```
+
+##### 31.5.3 编译及测试
+
+###### 31.5.3.1 发送进程
+
+```bash
+cd your_file_path/msg/msg_send/
+make
+./msg_send
+```
+
+![image-20241111195058951](.assets/image-20241111195058951.png)
+
+###### 31.5.3.2 查看消息队列
+
+可以通过 `ipcs -q` 命令来查看系统中存在的消息队列，若以上队列没有关闭，它的查看结果如下：
+
+![image-20241111195156885](.assets/image-20241111195156885.png)
+
+###### 31.5.3.3 接收进程
+
+打开一个<u>新终端</u>，编译及运行接收消息进程：
+
+```bash
+cd your_file_path/msg/msg_recv/
+make
+./mag_revc
+```
+
+当你从发送消息进程输入消息时（按下回车键发送），接收消息进程会打印出你输入的消息，若无消息则接收进程会阻塞等待，接收到 `quit` 消息会退出进程。
+
+![image-20241111195535268](.assets/image-20241111195535268.png)
+
+> [!note]
+>
+> 在本例子中，若发送进程不是通过 `quit` 消息退出（如 `Ctrl+C` 或 `Ctrl+D`），则不会触发接收进程主动删除消息队列，在这种情况下可通过 `ipcs -q` 命令查看到该消息队列依然存在，通过 `ipcrm -q [消息队列 qid]` 即可删除。
+
+### 32. system-V IPC 信号量
+
+> [!NOTE]
+>
+> **本章主要讲解进程信号量的内容，如非特别说明，“信号量” 均表示system-V IPC 信号量**，这主要是为了区分后续章节的 “POSIX 信号量”
+
+#### 32.1 进程信号量的基本概念
+
+信号量与已经介绍过的信号、管道、FIFO 以及消息队列不同，它==本质上是一个计数器，用于协调多进程间对共享数据对象的读取==，它不以传送数据为主要目的，它主要是用来保护共享资源（信号量也属于临界资源），使得该临界资源在一个时刻只有一个进程独享。可能会有同学要问了，<u>为什么不使用全局变量呢？</u>那是因为全局变量并不能在进程间共同使用，因为进程间是相互独立的，而且也无法保证引用计数的原子操作，因此使用系统提供的信号量即可。
+
+#### 32.2 信号量的工作原理
+
+由于信号量只能进行两种操作：等待和发送信号，即 P 操作和 V 操作，锁行为就是 P 操作，解锁就是 V 操作，可以直接理解为 P 操作是申请资源，V 操作是释放资源。PV 操作是计算机操作系统需要提供的基本功能之一，它们的行为是这样的：
+
+- `P` 操作：如果有可用的资源（信号量值大于 0），则占用一个资源（给信号量值减去一，进入临界区代码）; 如果没有可用的资源（信号量值等于 0），则阻塞，直到系统将资源分配给该进程（进入等待队列，一直等到资源轮到该进程）。这就像你要把车开进停车场之前，先要向保安申请一张停车卡一样，P 操作就是申请资源，如果申请成功，资源数（空闲的停车位）将会减少一个，如果申请失败，要不在门口等，要不就走人。
+- `V` 操作：如果在该信号量的等待队列中有进程在等待资源，则唤醒一个阻塞的进程。如果没有进程等待它，则释放一个资源（给信号量值加一），就跟你从停车场出去的时候一样，空闲的停车位就会增加一个。
+
+举个例子，就是两个进程共享信号量 `sem`，`sem` 可用信号量的数值为 1（资源数为1），一旦其中一个进程执行了 P 操作，它将得到信号量，并可以进入临界区，使 `sem` 减 1。而第二个进程将被阻止进入临界区，因为当它试图执行 P 操作时，`sem` 为 0，它会被挂起以等待第一个进程离开临界区域并执行 V 操作释放了信号量，这时第二个进程就可以恢复执行。
+
+在==信号量进行 PV 操作时都为原子操作==（因为它需要保护临界资源）。
+
+> [!Note]
+>
+> **原子操作**：单指令的操作称为原子的，单条指令的执行是不会被打断的
+
+简单来说就是内核可以对这个信号量（计数器）做加减操作，并且操作时遵守一些基本操作原则，即：对信号量（计数器）做加操作立即返回，做减操作要判断信号量（计数器）当前值是否可减？（需要信号量的当前值大于等于 1），如果满足则进行减操作；否则将进程阻塞等待，直到系统中有进程对该信号量进行 V 操作。
+
+#### 32.3 创建或获取一个信号量
+
+##### 32.3.1 semget 创建/获取函数
+
+`semget` 函数的功能是创建或者获取一个已经创建的信号量，如果成功则返回对应的信号量标识符，失败则返回-1。函数原型如下：
+
+```c
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>
+
+int semget(key_t key, int nsems, int semflg);
+```
+
+参数说明：
+
+- `key`：与消息队列一样的是，参数 `key` 用来标识系统内的信号量，如果指定的 `key` 已经存在，则意味着打开这个信号量，这时 `nsems` 参数指定为 0，`semflg` 参数也指定为 0。特别地，可以使用 *IPC_PRIVATE* 创建一个没有 `key` 的信号量。
+
+- `nsems` : 本参数用于在创建信号量的时候，表示可用的信号量数目。
+- `semflg`：`semflg` 参数用来指定标志位，与消息队列中的类似。主要有 *IPC_CREAT*，*IPC_EXCL* 和权限 `mode`，其中使用 *IPC_CREAT* 标志创建新的信号量，即使该信号量已经存在（具有同一个键值的信号量已在系统中存在），也不会出错。如果同时使用 *IPC_EXCL* 标志可以创建一个新的唯一的信号量，此时如果该信号量已经存在，该函数会返回出错。
+
+创建信号量时，还受到以下系统信息的影响：
+
+- *SEMMNI*：系统中信号量总数的最大值。
+- *SEMMSL*：每个信号量中信号量元素个数的最大值。
+- *SEMMNS*：系统中所有信号量中的信号量元素总数的最大值。
+
+在 Linux 系统中，以上信息可通过命令 `ipcs -l` 查看.
+
+#### 32.4 信号量操作
+
+##### 32.4.1 semop() PV 操作函数
+
+Linux 提供了 `semop()` 函数对信号量进行 PV 操作。函数原型如下：
+
+```c
+int semop(int semid, struct sembuf *sops, size_t nsops);
+```
+
+参数说明：
+
+- `semid`: System V 信号量的标识符，用来标识一个信号量。
+
+- `sops`：是指向一个 `struct sembuf` 结构体数组的指针，该数组是一个信号量操作数组。原型如下：
+
+    ```c
+    struct sembuf
+    {
+    	unsigned short int sem_num; /* 信号量的序号从0 ~ nsems-1 */
+    	short int sem_op; /* 对信号量的操作，>0, 0, <0 */
+    	short int sem_flg; /* 操作标识：0， IPC_WAIT, SEM_UNDO */
+    };
+    ```
+
+    - `sem_num` 用于标识信号量中的第几个信号量，0 表示第 1 个，1 表示第 2 个，`nsems -1` 表示最后一个。
+    - `sem_op` 标识对信号量的所进行的操作类型。对信号量的操作有三种类型：
+        - `sem_op` 大于0，表示进程对资源使用完毕，交回该资源，即对该信号量执行 V 操作，交回的资源数由 `sem_op` 决定，系统会把 `sem_op` 的值加到该信号量的信号量当前值 `semval` 上。特别地，如果 `sem_flag` 指定了*SEM_UNDO*（还原）标志，则从该进程的此信号量调整值中减去 `sem_op`。
+        - `sem_op` 小于0，表示进程希望使用资源，对该信号量执行 P 操作， 当信号量当前值 `semval` 大于或者等于 `-sem_op` 时，`semval` 减掉 `sem_op` 的绝对值，为该进程分配对应数目的资源。特别地，如果指定 *SEM_UNDO*，则`sem_op` 的绝对值也加到该进程的此信号量调整值上。当 `semval` 小于 `-sem_op` 时，相应信号量的等待进程数量就加 1，调用进程被阻塞，直到 `semval` 大于或者等于 `-sem_op` 时，调用进程被唤醒，执行相应的 P 操作。
+        - `sem_op` 等于 0，表示进程要阻塞等待，直至信号量当前值 `semval` 变为 0。
+    - `sem_flg`，信号量操作的属性标志，可以指定的参数包括 *IPC_NOWAIT* 和 *SEM_UNDO*。如果为 0，表示正常操作；当指定了 *SEM_UNDO*，那么将维护进程对信号量的调整值，进程退出的时候会自动还原它对信号量的操作；当指定了*IPC_WAIT*，使对信号量的操作时非阻塞的。即指定了该标志，调用进程在信号量的值不满足条件的情况下不会被阻塞，而是直接返回 -1，并将 `errno` 设置为 *EAGAIN*。
+    - <u>那么什么是信号量调整值呢？</u>其实就是指定信号量针对某个特定进程的调整值。只有 `sembuf` 结构的 `sem_flag` 指定为*SEM_UNDO* 后，信号量调整值才会随着 `sem_op` 而更新。讲简单一点：对某个进程，在指定 *SEM_UNDO* 后，对信号量的当前值的修改都会反应到信号量调整值上，当该进程终止的时候，内核会根据信号量调整值重新恢复信号量之前的值，*SEM_UNDO* 操作可以防止进程退出时没有释放信号量导致的死锁。
+
+- `nsops`：表示上面 `sops` 数组的数量，如只有一个 `sops` 数组，`nsops` 就设置为 1。
+
+##### 32.4.2 semctl() 属性函数
+
+`semctl` 函数主要是对信号量集的一系列控制操作，根据操作命令 `cmd` 的不同，执行不同的操作，第四个参数是可选的。原型如下：
+
+```c
+int semctl(int semid, int semnum, int cmd, ...);
+```
+
+- `semid`：System V 信号量的标识符；
+- `semnum`：表示信号量集中的第 `semnum` 个信号量。它的取值范围：`0 ~ nsems-1` 。
+
+- `cmd`：操作命令，主要有以下命令：
+
+    - *IPC_STAT*：获取此信号量集合的 `semid_ds` 结构，存放在第四个参数的 `buf` 中。
+    - *IPC_SET*：通过第四个参数的 `buf` 来设定信号量集相关联的 `semid_ds` 中信号量集合权限为 `sem_perm` 中的 `uid`，`gid`，`mode`。
+    - *IPC_RMID*：从系统中删除该信号量集合。
+    - *GETVAL*：返回第 `semnum` 个信号量的值。
+    - *SETVAL*：设置第 `semnum` 个信号量的值，该值由第四个参数中的 `val` 指定。
+    - *GETPID*：返回第 `semnum` 个信号量的 `sempid`，最后一个操作的 `pid`。
+    - *GETNCNT*：返回第 `semnum` 个信号量的 `semncnt`。等待 `semval` 变为大于当前值的线程数。
+    - *GETZCNT*：返回第 `semnum` 个信号量的 `semzcnt`。等待 `semval` 变为 0 的线程数。
+    - *GETALL*：去信号量集合中所有信号量的值，将结果存放到的 `array` 所指向的数组。
+    - *SETALL*：按 `arg.array` 所指向的数组中的值，设置集合中所有信号量的值。
+
+- 第四个参数是可选的：如果使用该参数，该参数的类型为 `union semun`，它是多个特定命令的联合体，具体如下：
+
+    ```c
+    union semun {
+    	int val; /* Value for SETVAL */
+        struct semid_ds *buf; /* Buffer for IPC_STAT, IPC_SET */
+    	unsigned short *array; /* Array for GETALL, SETALL */
+    	struct seminfo *__buf; /* Buffer for IPC_INFO(Linux-specific) */
+    };
+    ```
+
+#### 32.5 信号量示例
+
+因为 system V 的信号量相关的函数调用接口比较复杂，本示例将其封装成单个信号量的几个基本函数。这些函数的实现单独作为 `sem.c` 文件的内容，同时还实现一个 `sem.h` 作为外部调用的头文件。具体实现如下所示:
+
+```c
+// path: base_linux/system_programing/systemV_sem/sources/sem.c
+#include <sys/sem.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/shm.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "sem.h"
+
+/* 信号量初始化/赋值函数 */
+int init_sem(int sem_id, int init_value)
+{
+    union semun sem_union;
+    sem_union.val = init_value;
+
+    if (semctl(sem_id, 0, SETVAL, sem_union) == -1)
+    {
+        perror("Initialize semaphore");
+        return -1;
+    }
+
+    return 0;
+}
+
+/* 从系统中删除信号量的函数 */
+int del_sem(int sem_id)
+{
+    union semun sem_union;
+    if (semctl(sem_id, 0, IPC_RMID, sem_union) == -1)
+    {
+        perror("Delete semaphore");
+        return -1;
+    }
+}
+
+/* P 操作函数 */    
+int sem_p(int sem_id)
+{
+    struct sembuf sops;
+    sops.sem_num = 0;
+    sops.sem_op = -1;
+    sops.sem_flg = SEM_UNDO;
+
+    if (semop(sem_id, &sops, 1) == -1)
+    {
+        perror("P operation");
+        return -1;
+    }
+
+    return 0;
+}
+
+/* V 操作函数 */
+int sem_v(int sem_id)
+{
+    struct sembuf sops;
+    sops.sem_num = 0;
+    sops.sem_op = 1;
+    sops.sem_flg = SEM_UNDO;
+
+    if (semop(sem_id, &sops, 1) == -1)
+    {
+        perror("V operation");
+        return -1;
+    }
+
+    return 0;
+}
+```
+
+它们分别为信号量初始化函数 `sem_init()`、删除信号量的函数 `sem_del()`、P 操作函数 `sem_p()` 以及 V 操作函数 `sem_v()`。具体说明如下：
+
+- `sem_init`：初始化函数，根据给定的参数设置信号量的初始值，用于设置初始可用资源数。函数的内部通过调用 `semctl()` 使用 *SETVAL* 命令设置 `semun` 类型的 `sem_union` 变量，该变量中包含了信号量初始值。
+- `sem_del`：删除信号量函数，通过调用 `semctl()` 使用 *IPC_RMID* 命令删除指定的信号量。
+- `sem_p`：P 操作函数，调用 `semop()` 设置调整值，其中的 `sops.sem_op` 值为 -1，表示每次 P 操作使信号量的值减 1。
+- `sem_v`：V 操作函数，调用 `semop()` 设置调整值，它与 P 操作函数的差异是 `sops.sem_op` 的值为 +1，表示每次 V 操作使信号量的值加 1。
+
+下面是 `sem.c` 对应的头文件：
+
+```c
+// path: base_linux/system_programing/systemV_sem/includes/sem.h
+#ifndef _SEM_H
+#define _SEM_H
+
+union semun
+{
+    int val;
+    struct semid_ds *buf;
+    unsigned short *array;
+};
+
+extern int init_sem(int sem_id, int init_value);
+extern int del_sem(int sem_id);
+extern int sem_p(int sem_id);
+extern int sem_v(int sem_id);
+
+#endif /* _SEM_H */
+```
+
+利用上面封装的操作函数，编写以下测试示例，首先创建一个子进程，接下来使用信号量来控制两个进程（父子进程）之间的执行顺序。
+
+```c
+// path: base_linux/system_programing/systemV_sem/sources/test.c
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "sem.h"
+
+#define DELAY_TIME 3
+
+int main(void)
+{
+    pid_t result;
+    int sem_id;
+
+    /* 创建一个信号量 */
+    sem_id = semget((key_t)6666, 1, 0666 | IPC_CREAT);
+
+    init_sem(sem_id, 0);
+
+    /* 调用 fork() 函数 */
+    result = fork();
+    if (result == -1)
+    {
+        perror("Fork\n");
+    }
+
+    else if (result == 0)
+    {
+        printf("Child process will wait for some seconds...\n");
+        sleep(DELAY_TIME);
+        printf("The returned value is %d in the child process(PID = %d)\n", result, getpid());
+
+        sem_v(sem_id);
+    }
+
+    else
+    {
+        sem_p(sem_id);
+        printf("The returned value is %d in the father process(PID = %d)\n", result, getpid());
+
+        sem_v(sem_id);
+
+        del_sem(sem_id);
+    }
+
+    exit(0);
+}
+```
+
+代码说明如下：
+
+- 第 24 行：调用 `semget()` 创建一个信号量，权限为 0666，即任何用户均可读写。
+- 第 26 行：调用 `init_sem()` 初始化信号量值为 0。
+- 第 29 行，使用 `fork` 函数创建子进程。
+
+- 第 34~40 行，子进程先睡眠一定时间，结束睡眠后通过 `sem_v` 给信号量加 1。
+- 第 41~49 行，父进程通过 `sem_p()` 等待信号量，得到信号量后才输出信息。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/system_programing/systemV_sem/Makefile
+TARGET = test
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
+```
+
+编译 & 运行文件：
+
+```bash
+make
+./test
+```
+
+![image-20241112150013336](.assets/image-20241112150013336.png)
+
+### 33. 共享内存
+
+#### 33.1 共享内存的基本概念
+
+什么是共享内存？顾名思义，共享内存就是将内存进行共享，它允许多个不相关的进程访问同一个逻辑内存，直接将一块裸露的内存放在需要数据传输的进程面前，让它们自己使用。因此，==共享内存是效率最高的一种 IPC 通信机制，它可以在多个进程之间共享和传递数据==，进程间需要共享的数据被放在共享内存区域，所有需要访问该共享区域的进程都要把该共享区域映射到本进程的地址空间中去，因此所有进程都可以访问共享内存中的地址，就好像它们是由用 C 语言函数 `malloc` 分配的内存一样。
+
+但是，这种共享的内存需要进程自己去维护好，如同步、互斥等工作，比如当进程 1 在读取共享内存的数据时，进程 2 却修改了共享内存中的数据，那么必然会造成数据的混乱，进程 1 读取到的数据就是错误的，因此，==共享内存是属于临界资源==，在某一时刻最多只能有一个进程对其操作（读/写数据），==共享内存一般不能单独使用，而要配合信号量、互斥锁等协调机制==，让各个进程在高效交换数据的同时，不会发生数据践踏、破坏等意外。
+
+共享内存的思想非常简单，进程与进程之间虚拟内存空间本来相互独立，不能互相访问的，但是可以通过某些方式，使得相同的一块物理内存多次映射到不同的进程虚拟空间之中，这样的效果就相当于多个进程的虚拟内存空间部分重叠在一起，如下图所示：
+
+<img src=".assets/image-20241112150915481.png" alt="image-20241112150915481" style="zoom: 33%;" />
+
+
+
+当进程 1 向共享内存写入数据后，共享内存的数据就变化了，那么进程 2 就能立即读取到变化了的数据，而这中间并未经过内核的拷贝，因此效率极高。
+
+**总的来说共享内存有以下特点：**
+
+1. 共享内存是==进程间通信中效率最高的方式之一==。
+2. 共享内存是系统出于多个进程之间通讯的考虑，而预留的的一块内存区，因此==共享内存是以传输数据为目的的==。
+3. 共享内存==允许两个或更多进程访问同一块内存==，当一个进程改变了这块地址中的内容的时候，其它进程都会察觉到这个更改。
+4. 共享内存无同步无互斥。
+
+**共享内存的优缺点：**
+
+- <u>优点</u>：使用共享内存进行进程间的通信非常方便，而且函数的接口也简单，数据的共享使进程间的数据不用传送，而是直接访问内存，加快了程序的效率。同时，它也不像匿名管道那样要求通信的进程有一定的 “血缘” 关系，只要是系统中的任意进程都可以对共享内存进行读写操作。
+- <u>缺点</u>：共享内存没有提供同步的机制，这使得我们在使用共享内存进行进程间通信时，往往要借助其他的手段（如信号量、互斥量等）来进行进程间的同步工作。
+
+#### 33.2 shmget() 创建共享内存函数
+
+内核提供了 `shmget()` 函数的创建或获取一个共享内存对象，并返回共享内存标识符。函数原型如下：
+
+```c
+int shmget(key_t key, size_t size, int shmflg);
+```
+
+参数说明：
+
+- `key`：标识共享内存的键值，可以有以下取值：
+    - 0 或 *IPC_PRIVATE*。当 `key` 的取值为 *IPC_PRIVATE*，则函数 `shmget()` 创建一块新的共享内存；如果 `key` 的取值为 0，而参数 `shmflg` 中设置了 *IPC_PRIVATE* 这个标志，则同样将创建一块新的共享内存。
+    - 大于 0 的 32 位整数：视参数 `shmflg` 来确定操作。
+- `size`：要创建共享内存的大小，所有的内存分配操作都是以页为单位的，所以即使只申请只有一个字节的内存，内存也会分配整整一页。
+- `shmflg`：表示创建的共享内存的模式标志参数，在真正使用时需要与 IPC 对象存取权限 `mode`（如 0600）进行 `｜` 运算来确定共享内存的存取权限。`msgflg` 有多种情况：
+    - *IPC_CREAT*：如果内核中不存在关键字与 `key` 相等的共享内存，则新建一个共享内存；如果存在这样的共享内存，返回此共享内存的标识符。
+    - *IPC_EXCL*：如果内核中不存在键值与 `key` 相等的共享内存，则新建一个共享内存；如果存在这样的共享内存则报错。
+    - *SHM_HUGETLB*：使用 “大页面” 来分配共享内存，所谓的 “大页面” 指的是内核为了提高程序性能，对内存实行分页管理时，采用比默认尺寸（4KB）更大的分页，以减少缺页中断。Linux 内核支持以 2MB 作为物理页面分页的基本单位。
+    - *SHM_NORESERVE*：不在交换分区中为这块共享内存保留空间。
+- 返回值：`shmget()` 函数的返回值是共享内存的 ID。
+
+当调用 `shmget()` 函数失败时将产生错误代码，有如下取值：
+
+- *EACCES*：`key` 指定的共享内存已存在，但调用进程没有权限访问它
+- *EEXIST*：`key` 指定的共享内存已存在，而 `msgflg` 中同时指定 *IPC_CREAT* 和 *IPC_EXCL* 标志
+- *EINVAL*：创建共享内存时参数 `size` 小于 *SHMMIN* 或大于 *SHMMAX*。
+- *ENFILE*：已达到系统范围内打开文件总数的限制。
+- *ENOENT*：给定的 `key` 不存在任何共享内存，并且未指定 *IPC_CREAT*。
+- *ENOMEM*：内存不足，无法为共享内存分配内存。
+
+#### 33.3 shmat() 映射函数
+
+从共享内存的基本概念不难看出，如果一个进程想要访问一个共享内存，那么需要将其映射到进程的虚拟空间中，然后再去访问它，那么系统提供的 `shmat()` 函数就是把共享内存区对象映射到调用进程的地址空间。函数原型如下：
+
+```c
+void *shmat(int shmid, const void *shmaddr, int shmflg);
+```
+
+参数说明：
+
+- `shmid`：共享内存 ID，通常是由 `shmget()` 函数返回的。
+- `shmaddr`：如果不为 NULL，则系统会根据 `shmaddr` 来选择一个合适的内存区域，如果为 NULL，则系统会自动选择一个合适的虚拟内存空间地址去映射共享内存。
+- `shmflg`：操作共享内存的方式：
+    - *SHM_RDONLY*：以只读方式映射共享内存。
+    - *SHM_REMAP*：重新映射，此时 `shmaddr` 不能为 NULL。
+    - *NULLSHM*：自动选择比 `shmaddr` 小的最大页对齐地址。
+
+`shmat()` 函数调用成功后返回共享内存的起始地址，这样子我们就能操作这个共享内存了。共享内存的映射有以下注意的要点：
+
+- 共享内存只能以只读或者可读写方式映射，无法以只写方式映射。
+- `shmat()` 第二个参数 `shmaddr` 一般都设为 NULL，让系统自动找寻合适的地址。但当其确实不为空时，那么要求*SHM_RND* 在 `shmflg` 必须被设置，这样的话系统将会选择比 `shmaddr`小而又最大的页对齐地址（即为 *SHMLBA* 的整数倍）作为共享内存区域的起始地址。如果没有设置 *SHM_RND*，那么 `shmaddr` 必须是严格的页对齐地址。
+
+#### 33.4 shmdt() 解除映射函数
+
+`shmdt()` 函数与 `shmat()` 函数相反，是用来解除进程与共享内存之间的映射的，在解除映射后，该进程不能再访问这个共享内存。函数原型：
+
+```c
+int shmdt(const void *shmaddr);
+```
+
+参数说明：
+
+- `shmaddr`：映射的共享内存的起始地址。
+
+`shmdt()` 函数调用成功返回 0，如果出错则返回 -1，并且将错误原因存于 `errno` 中。
+
+虽然 `shmdt()` 函数很简单，但是还是有注意要点的：该函数并不删除所指定的共享内存区，而只是将先前用 `shmat()` 函数映射好的共享内存脱离当前进程，共享内存还是存在于物理内存中。
+
+#### 33.5 shmctl() 获取或设置属性函数
+
+内核提供了 `shmctl()` 用于获取或者设置共享内存的相关属性。函数原型：
+
+```c
+int shmctl(int shmid, int cmd, struct shmid_ds *buf);
+```
+
+参数说明：
+
+- `shmid`：共享内存标识符。
+
+- `cmd`：函数功能的控制命令，其取值如下：
+
+    - IPC_STAT：获取属性信息，放置到 `buf` 中。
+
+    - IPC_SET：设置属性信息为 `buf` 指向的内容。
+
+    - IPC_RMID：删除该共享内存。
+
+    - IPC_INFO：获得关于共享内存的系统限制值信息。
+
+    - SHM_INFO：获得系统为共享内存消耗的资源信息。
+
+    - SHM_STAT：与 IPC_STAT 具有相同的功能，但 `shmid` 为该 SHM 在内核中记录所有 SHM 信息的数组的下标，因此通过迭代所有的下标可以获得系统中所有 SHM 的相关信息。
+
+    - SHM_LOCK：禁止系统将该 SHM 交换至 `swap` 分区。
+
+        > [!caution]
+        >
+        > 选项 SHM_LOCK 不是锁定读写权限，而是锁定 SHM 能否与 `swap` 分区发生交换。一个 SHM 被交换至 `swap` 分区后如果被设置了 SHM_LOCK，那么任何访问这个 SHM 的进程都将会遇到页错误。进程可以通过 IPC_STAT 后得到的 `mode` 来检测 SHM_LOCKED 信息。
+
+    - SHM_UNLOCK：允许系统将该 SHM 交换至 `swap` 分。
+
+- `buf`：共享内存属性信息结构体指针，设置或者获取信息都通过该结构体，`shmid_ds` 结构如下：
+
+    ```c
+    struct shmid_ds {
+    	struct ipc_perm shm_perm; /* 所有权和权限*/
+    	size_t shm_segsz;         /* 共享内存尺寸（字节） */
+    	time_t shm_atime;         /* 最后一次映射时间*/
+    	time_t shm_dtime;         /* 最后一个解除映射时间*/
+    	time_t shm_ctime;         /* 最后一次状态修改时间*/
+    	pid_t shm_cpid;           /* 创建者PID */
+    	pid_t shm_lpid;           /* 后一次映射或解除映射者PID */
+    	shmatt_t shm_nattch;      /* 映射该SHM 的进程个数*/
+    	...
+    };
+    ```
+
+    其中权限信息结构体如下：
+
+    ```c
+    struct ipc_perm {
+    	key_t __key;           /* 该共享内存的键值key */
+    	uid_t uid;             /* 所有者的有效UID */
+    	gid_t gid;             /* 所有者的有效GID */
+    	uid_t cuid;            /* 创建者的有效UID */
+    	gid_t cgid;            /* 创建者的有效GID */
+    	unsigned short mode;   /* 读写权限+ SHM_DEST + SHM_LOCKED 标记*/
+        unsigned short __seq;  /* 序列号*/
+    };
+    ```
+
+#### 33.6 使用示例
+
+使用共享内存的一般步骤是：
+
+1. 创建或获取共享内存 ID。
+2. 将共享内存映射至本进程虚拟内存空间的某个区域。
+3. 当不再使用时，解除映射关系。
+4. 当没有进程再需要这块共享内存时，删除它。
+
+共享内存由于其特性，与进程中的其他内存段在使用习惯上有些不同。一般进程对栈空间分配可以自动回收，而堆空间通过`malloc` 申请，`free` 回收，这些内存在回收之后就可以认为是不存在了。但是共享内存不同，用 `shmdt()` 函数解除映射后，实际上其占用的内存还在，并仍然可以使用 `shmat` 映射使用。如果不使用 `shmctl()` 函数删除这个共享内存的话，那么它将一直保留直到系统被关闭，除此之外，我们应该配合信号量去使用共享内存，避免多进程间的随意使用造成数据踩踏。
+
+整个实验的思路是：首先创建 system V 信号量用于控制临界区，然后实现两个进程，分别为共享内存写进程，共享内存读进程，在写进程中实现写数据，在读进程中将数据读取，并且打印出来，代码如下：
+
+##### 33.6.1 共享内存写进程
+
+```c
+// path: base_linux/system_programing/shm_write/sources/shm_write.c
+
+```
+
+
+
+
+
+
+
 
 
 
@@ -10053,7 +11037,6 @@ Linux 内核提供了一系列函数来使用消息队列：
 > **参考书籍：** [[野火]《嵌入式Linux驱动开发实战指南—基于LubanCat RK系列板卡》](https://doc.embedfire.com/linux/rk356x/driver/zh/latest/index.html)
 >
 > **使用板卡：** LubanCat 4 RK3588S
->
 
 ### 1. 获取内核源码
 
@@ -10102,13 +11085,13 @@ cd ~/桌面/LubanCat/LubanCat4_RK3588_SDK
 7z x LubanCat_Linux_rk3588_SDK_20240510.7z
 ```
 
-4. 检出 *.repo* 目录下的 git 仓库
+4. 检出 `.repo` 目录下的 git 仓库
 
 ```shell
 .repo/repo/repo sync -l
 ```
 
-5. 进入 kernel 目录
+5. 进入 `kernel` 目录
 
 ```
 ls
@@ -10214,7 +11197,7 @@ Linux3.x 以后的版本才引入了设备树，设备树用于描述一个硬�
 设备树描述硬件资源时有两个特点：
 
 1. 以 “ 树状 ” 结构描述硬件资源。例如本地总线为树的 “ 主干 ” 在设备树里面称为 “ 根节点 ”，挂载到本地总线的 IIC 总线、SPI 总线、UART 总线为树的 “ 枝干 ” 在设备树里称为“ 根节点的子节点 ”，IIC 总线下的 IIC 设备不止一个，这些 “ 枝干 ” 又可以再分，除了根节点没有父节点外，其他节点都只有一个父节点。
-2. 设备树源文件可以像头文件 ( `.h` 文件 ) 那样，一个设备树文件引用另外一个设备树文件，这样可以实现 “ 代码 ” 的重用。例如多个硬件平台都使用 rk 系列处理器作为主控芯片，那么我们可以将 rk 系列芯片的硬件资源写到一个单独的设备树文件里面一般使用 `.dtsi`后缀，其他板级设备树文件直接使用 `# include xxx.dtsi` 引用即可。
+2. 设备树源文件可以像头文件 ( `.h` 文件 ) 那样，一个设备树文件引用另外一个设备树文件，这样可以实现 “ 代码 ” 的重用。例如多个硬件平台都使用 rk 系列处理器作为主控芯片，那么我们可以将 rk 系列芯片的硬件资源写到一个单独的设备树文件里面一般使用 `.dtsi`后缀，其他板级设备树文件直接使用 `#include xxx.dtsi` 引用即可。
 
 DTS、DTC 和 DTB 是文档中常见的几个缩写：
 
@@ -10248,8 +11231,6 @@ DTS、DTC 和 DTB 是文档中常见的几个缩写：
 > **使用板卡：** LubanCat 4 RK3588S
 >
 > **板卡系统**：Ubuntu 22.04.3 LTS (GNU/Linux 5.10.160-rockchip aarch64)
-
-
 
 随着 AI 技术在各个行业快速发展，在云端部署到实际应用场景中存在隐私保护、通讯延时、成本等问题，将 AI 技术和嵌入式系统结合，构建边缘计算成为当前技术热点之一。
 
@@ -10330,6 +11311,14 @@ graph LR;
 Anaconda 是可以便捷获取包且对包能够进行管理，同时对环境可以统一管理的发行版本。Anaconda 包含了 conda、Python 在内的众多流行的科学计算、数据分析包。
 
 Anaconda 安装可以从官网网页直接下载，根据系统选择不同的版本安装。这里选择的是适用于 ubuntu20.04 x86_64 的
+
+
+
+
+
+
+
+
 
 
 
@@ -10700,3 +11689,4 @@ HDMI 屏幕的分辨率支持取决于设备的硬件能力和显示器的兼容
 3. **HDMI 兼容性**：HDMI 协议在某些模式下可能存在特定的限制或问题，而 1920x1080 是广泛支持的标准模式，因此更可能成功显示。
 
 如遇到分辨率兼容问题，选择显示器原生或 HDMI 标准模式（如 1920x1080）通常能保证更高的兼容性和稳定性。
+
