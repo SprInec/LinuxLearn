@@ -8363,7 +8363,7 @@ sudo apt install psmisc
 
 进程（process）则是程序执行的具体实例，比如一个可执行文件，在执行的时候，它就是一个进程，直到该程序执行完毕。那么在程序执行的过程中，它享有系统的资源，至少包括进程的运行环境、CPU、外设、内存、进程 ID 等资源与信息，同样的一个程序，可以实例化为多个进程，在 Linux 系统下使用 `ps` 命令可以查看到当前正在执行的进程，当这个可执行程序运行完毕后，进程也会随之被销毁（可能不是立即销毁，但是总会被销毁）。
 
-程序并不能单独执行，只有将程序加载到内存中，系统为它分配资源后才能够执行，这种正在执行的程序称之为进程，也就是说进程是系统进行资源分配和调度的一个独立单位，每个进程都有自己单独的地址空间。
+程序并不能单独执行，只有=程序加载到内存中，系统为它分配资源后才能够执行，这种正在执行的程序称之为进程，也就是说==进程是系统进行资源分配和调度的一个独立单位，每个进程都有自己单独的地址空间==。
 
 > [!NOTE]
 >
@@ -10551,9 +10551,9 @@ int semop(int semid, struct sembuf *sops, size_t nsops);
     ```c
     struct sembuf
     {
-    	unsigned short int sem_num; /* 信号量的序号从0 ~ nsems-1 */
-    	short int sem_op; /* 对信号量的操作，>0, 0, <0 */
-    	short int sem_flg; /* 操作标识：0， IPC_WAIT, SEM_UNDO */
+    	unsigned short int sem_num;   /* 信号量的序号从0 ~ nsems-1 */
+    	short int sem_op;             /* 对信号量的操作，>0, 0, <0 */
+    	short int sem_flg;            /* 操作标识：0， IPC_WAIT, SEM_UNDO */
     };
     ```
 
@@ -11013,20 +11013,783 @@ int shmctl(int shmid, int cmd, struct shmid_ds *buf);
 
 ```c
 // path: base_linux/system_programing/shm_write/sources/shm_write.c
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "sem.h"
+
+int main(void)
+{
+    int running = 1;
+    void *shm = NULL;
+    struct shared_use_st *shared = NULL;
+    char buffer[BUFSIZ + 1]; // 保存输入的文字
+    int shmid;
+    int semid; // 信号量标识符
+
+    // 创建共享内存
+    shmid = shmget((key_t)1234, 4096, 0644 | IPC_CREAT);
+    if (shmid == -1)
+    {
+        fprintf(stderr, "shmget failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // 将共享内存连接到当前进程的地址空间
+    shm = shmat(shmid, (void *)0, 0);
+    if (shm == (void *)-1)
+    {
+        fprintf(stderr, "shmat failed\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Memory attached at %p\n", shm);
+
+    /* 打开信号量，不存在则创建 */
+    semid = semget((key_t)6666, 1, 0666 | IPC_CREAT);
+    if (semid == -1)
+    {
+        printf("sem open fail\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // 向共享内存中写数据
+    while (running)
+    {
+        printf("Enter some text:");
+        fgets(buffer, BUFSIZ, stdin);
+        strncpy(shm, buffer, 4096);
+
+        /* 释放信号量 */
+        sem_v(semid);
+
+        /* 输入了 end，退出循环 /程序*/
+        if(strncmp(buffer, "end", 3) == 0)
+            running = 0;
+    }
+
+    // 把共享内存从当前进程中分离
+    if (shmdt(shm) == -1)
+    {
+        fprintf(stderr, "shmdt failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    sleep(2);
+    exit(EXIT_SUCCESS);
+}
+```
+
+> [!NOTE]
+>
+> 第 13 行的 `sem.h` 源自 [32.5 信号量示例](#32.5 信号量示例)
+
+代码说明如下：
+
+- 第 25 行调用 `shmget()` 创建或获取一个大小为4096 的共享内存。
+- 第 33 行，调用 `shmat()` 函数映射共享内存到当前进程，地址保存到 `shm` 指针。
+- 第 54 行，使用 `strncpy` 函数把用户输入得到的字符拷贝至共享内存 `shm` 中。
+
+代码中写入到共享内存后，通过释放信号量操作告知其它进程有可获取的资源，这是常用的共享内存临界段保护方法。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/system_programing/shm_read/Makefile
+TARGET = shm_write
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
+```
+
+##### 33.6.2 共享内存读进程
+
+```c
+// path: base_linux/system_programing/shm_read/sources/shm_read.c
+#include <sys/types.h>
+#include <sys/shm.h>
+#include <sys/sem.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <errno.h>
+
+#include "sem.h"
+
+int main(void)
+{
+    int running = 1;
+    char *shm = NULL;
+    int shmid; // 共享内存标识符
+    int semid; // 信号量标识符
+
+    // 创建共享内存
+    shmid = shmget((key_t)1234, 4096, 0666 | IPC_CREAT);
+    if (shmid == -1)
+    {
+        fprintf(stderr, "shmget failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // 将共享内存连接到当前进程的地址空间
+    shm = shmat(shmid, 0, 0);
+    if (shm == (void *)-1)
+    {
+        fprintf(stderr, "shmat failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("\nMemory attached at %p\n", shm);
+
+    /* 打开信号量，不存在则创建 */
+    semid = semget((key_t)6666, 1, 0666 | IPC_CREAT);
+    if (semid == -1)
+    {
+        printf("sem open fail\n");
+        exit(EXIT_FAILURE);
+    }
+
+    init_sem(semid, 0);
+
+    while (running)
+    {
+        /* 等待信号量 */
+        if (sem_p(semid) == 0)
+        {
+            printf("You wrote: %s", shm);
+            sleep(rand() % 3);
+
+            // 输入了 end， 退出循环/程序
+            if (strncmp(shm, "end", 3) == 0)
+                running = 0;
+        }
+    }
+
+    // 删除信号量
+    del_sem(semid);
+
+    // 把共享内存从当前进程中分离
+    if (shmdt(shm) == -1)
+    {
+        fprintf(stderr, "shmctl(IPC_RMID) failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    exit(EXIT_SUCCESS);
+}
+```
+
+> [!note]
+>
+> 第 14 行的 `sem.h` 源自 [32.5 信号量示例](#32.5 信号量示例)
+
+代码说明如下：
+
+- 第 24 行，调用 `shmget()` 创建或获取一个大小为 4096 的共享内存。
+- 第 32 行，调用 `shmat()` 函数映射共享内存到当前进程，地址保存到 `shm` 指针。
+- 第 54~61 行，使用 `sem_p` 等待信号量，获取到信号量后，直接使用 `printf` 函数打印出共享内存 `shm` 的内容。
+
+Makefile 文件：
+
+```makefile
+# path: base_linux/system_programing/shm_read/Makefile
+TARGET = shm_read
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
+```
+
+##### 33.6.3 编译&运行
+
+打开两个终端，分别在 `shm_write` 和 `shm_read` 目录下使用 `make` 进行编译后运行进程。
+
+```bash
+# terminal 1
+make
+./shm_write
+```
+
+```bash
+# terminal 2
+make
+./shm_read
+```
+
+结果如下：
+
+![image-20241114201859726](.assets/image-20241114201859726.png)
+
+![image-20241114201928770](.assets/image-20241114201928770.png)
+
+### 34. 线程
+
+#### 34.1 线程和进程
+
+在很多 Linux 的书籍基本上都是这样子描述进程（process）和线程（thread）的：==进程是资源管理的最小单位==，==线程是程序执行的最小单位==。
+
+这个描述非常言简意赅，在操作系统设计上，从进程演化出线程。<u>==线程的出现最主要的目的就是减小进程上下文切换开销==，这又是怎么一回事呢？</u>在前面的文章已经提到，进程是资源管理的最小单位，那么每个进程都拥有自己的数据段、代码段和堆栈段，这必然就造成了进程间切换时都要进行比较复杂的上下文切换等动作，因为要保存当前进程上下文的内容，还要恢复另一个进程的上下文。如果是经常切换进程的话，这样子的开销就过于庞大。因为在进程切换上下文时，需要重新映射虚拟地址空间、进出 OS 内核、寄存器切换，还会干扰处理器的缓存机制。因此为了进一步减少 CPU 在进程切换时的额外开销，Linux 进程演化出了另一个概念——线程。
+
+==线程是操作系统能够调度和执行的基本单位，在 Linux 中也被称之为轻量级进程==。在 Linux 系统中，==一个进程至少需要一个线程作为它的指令执行体==，进程管理着资源（比如 cpu、内存、文件等等），而将线程分配到某个 cpu 上执行。一个进程可以拥有多个线程，它还可以同时使用多个、cpu 来执行各个线程，以达到最大程度的并行，提高工作的效率；同时，即使是在单 cpu 的机器上，也依然可以采用多线程模型来设计程序，使设计更简洁、功能更完备，程序的执行效率也更高。
+
+从上面的这些概念我们不难得出一个非常重要的结论：
+
+**线程的本质是一个进程内部的一个控制序列，它是进程里面的东西，一个进程可以拥有一个线程或者多个线程。**它们的关系就如图所示：
+
+![image-20241114202639611](.assets/image-20241114202639611.png)
+
+回顾一下进程相关的知识：当进程执行 `fork()` 函数创建一个进程时，将创建出该进程的一个副本。这个新进程拥有自己的变量和自己的 PID，它的执行几乎完全独立于父进程，这样子得到一个新的进程开销是非常大的。而==当在进程中创建一个新线程时，新的执行线程将拥有自己的栈，但与它的创建者共享全局变量、文件描述符、信号处理函数和当前目录状态。==也就是说，它只使用当前进程的资源，而不是产生当前进程的副本。
+
+Linux 系统中的==每个进程都有独立的地址空间==，一个进程崩溃后，在系统的保护模式下并不会对系统中其它进程产生影响，而线程只是一个进程内部的一个控制序列，当进程崩溃后，线程也随之崩溃，所以==一个多进程的程序要比多线程的程序健壮，但在进程切换时，耗费资源较大，效率要差一些。==这就使得在某些场合下对于一些==要求同时进行并且又要共享某些变量的并发操作，只能用线程，不能用进程==。
+
+总的来说：
+
+- 一个程序至少有一个进程， 一个进程至少有一个线程。
+- 线程使用的资源是进程的资源，进程崩溃线程也随之崩溃。
+- 线程的上下文切换，要比进程更加快速，因为本质上，线程很多资源都是共享进程的，所以切换时，需要保存和切换的项相对较少。
+
+#### 34.2 创建线程
+
+在讲解线程编程之前，需要先了解一个知识点：<u>可移植操作系统接口（Portable Operating System Interface，缩写为POSIX）</u>，POSIX 是 IEEE 为了在各种 UNIX 操作系统上运行软件而定义 API 接口等一系列互相关联的标准的总称，其正式称呼为 IEEEStd 1003，而国际标准名称为 ISO/IEC9945，此标准源于一个大约开始于1985 年的项目。POSIX 这个名称是由理查德·斯托曼（RMS）应 IEEE 的要求而提议的一个易于记忆的名称。它基本上是 Portable Operating System Interface（可移植操
+作系统接口）的缩写，而 X 则表明其对 Unix API 的传承。
+
+简单来说，如果应用程序使用 POSIX 标准的接口来调用系统函数，那么应用程序将非常容易移植甚至直接兼容到遵循 POSIX 标准的系统上。
+
+在 Linux 系统下的多线程遵循 POSIX 标准，而其中的一套常用的线程库是 pthread，它是一套通用的线程库，是由 POSIX 提出的，因此具有很好的可移植性，我们学习的 Linux 多线程编程也正是使用它，在使用时必须包含以下头文件：
+
+```c
+#include <pthread.h>
+```
+
+除此之外在链接时需要使用库 `libpthread.a`。因为 pthread 的库不是 Linux 系统的库，所以在编译时要加上 `-lpthread` 选项。
+
+##### 34.2.1 pthread_create() 创建线程
+
+`pthread_create()` 函数是用于创建一个线程的，创建线程实际上就是确定调用该线程函数的入口点，在线程创建后，就开始运行相关的线程函数。函数原型如下：
+
+```c
+int pthread_create(pthread_t *thread, 
+                   const pthread_attr_t *attr,
+                   void *(*start_routine)(void *), void *arg);
+```
+
+参数说明：
+
+- `thread`：指向线程标识符的指针。
+- `attr`：设置线程属性，具体内容在下一小节。
+- `start_routine`：`start_routine` 是一个函数指针，指向要运行的线程入口，即线程运行时要执行的函数代码。
+- `arg`：运行线程时传入的参数。
+- 返回值：若线程创建成功，则返回0。若线程创建失败，则返回对应的错误代码。
+
+#### 34.3 线程属性
+
+上面 `pthread_create` 中需要以线程属性作为输入参数，在 Linux 中线程属性结构如下:
+
+```c
+typedef struct
+{
+	int etachstate;    				//线程的分离状态
+	int schedpolicy;   				//线程调度策略
+	structsched_param schedparam; 	 //线程的调度参数
+	int inheritsched;			    //线程的继承性
+	int scope; 					    //线程的作用域
+	size_t guardsize; 				//线程栈末尾的警戒缓冲区大小
+	int stackaddr_set; 				//线程的栈设置
+	void* stackaddr; 				//线程栈的位置
+	size_t stacksize; 				//线程栈的大小
+}pthread_attr_t;
+```
+
+> [!caution]
+>
+> 因为 pthread 并非Linux 系统的默认库，而是 POSIX 线程库。如果需要在 Linux 中将其作为一个库来使用，编译时需要加上 `-lpthread`（或 `-pthread`）以显式指定链接该库。函数在执行错误时的错误信息将作为返回值返回，并不修改系统全局变量 `errno`，所以无法使用 `perror()` 打印错误信息。
+
+线程的属性非常多，而且其属性值不能直接设置，须使用相关函数进行操作。线程属性主要包括如下属性：作用域（scope）、栈大小（stacksize）、栈地址（stackaddress）、优先级（priority）、分离的状态（detachedstate）、调度策略和参数（scheduling policy and parameters）。默认的属性为非绑定、非分离、1M 的堆栈大小、与父进程同样级别的优先级。下面简单讲解一下与线程属性相关的 API 接口：
+
+| API                              | 描述                                 |
+| :------------------------------- | ------------------------------------ |
+| `pthread_attr_init()`            | 初始化一个线程对象的属性             |
+| `pthread_attr_destroy()`         | 销毁一个线程属性对象                 |
+| `pthread_attr_getaffinity_np()`  | 获取线程间的 CPU 亲缘性              |
+| `pthread_attr_setaffinity_np()`  | 设置线程的 CPU 亲缘性                |
+| `pthread_attr_getdetachstate()`  | 获取线程分离状态属性                 |
+| `pthread_attr_setdetachstate()`  | 修改线程分离状态属性                 |
+| `pthread_attr_getguardsize()`    | 获取线程的栈保护区大小               |
+| `pthread_attr_setguardsize()`    | 设置线程的栈保护区大小               |
+| `pthread_attr_getscope()`        | 获取线程的作用域                     |
+| `pthread_attr_setscope()`        | 设置线程的作用域                     |
+| `pthread_attr_getstack()`        | 获取线程的堆栈信息（栈地址和栈大小） |
+| `pthread_attr_setstack()`        | 设置线程堆栈区                       |
+| `pthread_attr_getstacksize()`    | 获取线程堆栈大小                     |
+| `pthread_attr_setstacksize()`    | 设置线程堆栈大小                     |
+| `pthread_attr_getschedpolicy()`  | 获取线程的调度策略                   |
+| `pthread_attr_setschedpolicy()`  | 设置线程的调度策略                   |
+| `pthread_attr_getschedparam()`   | 获取线程的调度优先级                 |
+| `pthread_attr_setschedparam()`   | 设置线程的调度优先级                 |
+| `pthread_attr_getinheritsched()` | 获取线程是否继承调度属性             |
+| `pthread_attr_setinheritsched()` | 设置线程是否继承调度属性             |
+
+无其他特别需求，是可以不需要考虑线程相关属性的，使用默认的属性即可。
+
+##### 34.3.1 初始化线程对象属性
+
+使用 `pthread_attr_init()` 函数可以初始化线程对象的属性，函数原型：
+
+```c
+int pthread_attr_init(pthread_attr_t *attr);
+```
+
+- `attr`：指向一个线程属性的指针
+- 返回值：若函数调用成功返回 0，否则返回对应的错误代码。
+
+##### 34.3.2 销毁一个线程属性对象
+
+`pthread_attr_destroy()` 函数用于销毁一个线程属性对象。若 `pthread_create()` 函数使用已经销毁的线程属性对象创建线程，则会返回错误。
+
+`pthread_attr_destroy()` 函数原型：
+
+```c
+int pthread_attr_destroy(pthread_attr_t *attr);
+```
+
+- `attr`：指向一个线程属性的指针
+- 返回值：若函数调用成功返回 0，否则返回对应的错误代码。
+
+##### 34.3.3 线程的分离状态
+
+线程属性值中有一个分离状态，<u>什么是线程的分离状态呢？</u>在任何一个时间点上，线程是可结合的（joinable），或者是分离的（detached）。一个可结合的线程能够被其他线程收回其资源和杀死；在被其他线程回收之前，它的存储器资源（如栈）是不释放的。相反，一个分离的线程是不能被其他线程回收或杀死的，它的存储器资源在它终止时由系统自动释放。
+
+总而言之：==线程的分离状态决定一个线程以什么样的方式来终结自己==。
+
+进程中的线程可以调用 `pthread_join()` 函数来等待某个线程的终止，获取该线程的终止状态，并收回线程所占的资源，如果对线程的返回状态不感兴趣，可以将 `rval_ptr` 设置为 NULL。
+
+```c
+int pthread_join(pthread_t tid, void **rval_ptr);
+```
+
+除此之外线程也可以调用 `pthread_detach()` 函数将此线程设置为分离状态，设置为分离状态的线程在线程结束时，操作系统会自动收回它所占的资源。设置为分离状态的线程，不能再调用 `pthread_join()` 等待其结束。
+
+```c
+int pthread_detach(pthread_t tid);
+```
+
+如果一个线程是可结合的，意味着这条线程在退出时不会自动释放自身资源，而会成为僵尸线程，同时意味着该线程的退出值可以被其他线程获取。因此，如果不需要某个线程的退出值的话，那么最好将线程设置为分离状态，以保证该线程不会成为僵尸线程。
+
+如果在创建线程时就知道不需要了解线程的终止状态，那么可以通过修改 `pthread_attr_t` 结构体中的 `detachstate` 属性，来让线程以分离状态启动，调用的 `pthread_attr_setdetachstate()` 函数原型如下：
+
+```c
+int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate);
+```
+
+如果想要获取某个线程的分离状态，那么可以通过 `pthread_attr_getdetachstate()` 函数获取：
+
+```c
+int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate);
+```
+
+若函数调用成功返回 0，否则返回对应的错误代码。
+
+参数说明：
+
+- `attr`：指向一个线程属性的指针。
+- `detachstate`：如果值为*PTHREAD_CREATE_DETACHED*，则表示线程是分离状态，如果值为*PTHREAD_CREATE_JOINABLE* 则表示线程是结合状态。
+
+##### 34.3.4 线程的调度策略
+
+线程属性里包含了调度策略配置，POSIX 标准指定了三种调度策略：
+
+- 分时调度策略：*SCHED_OTHER*。这是线程属性的默认值，另外两种调度方式只能用于以超级用户权限运行的进程，因为它们都具备实时调度的功能，但在行为上略有区别。
+- 实时调度策略：先进先出方式调度(*SCHED_FIFO*)。基于队列的调度程序，对于每个优先级都会使用不同的队列，先进入队列的线程能优先得到运行，线程会一直占用 CPU，直到有更高优先级任务到达或自己主动放弃 CPU 使用权。
+- 实时调度策略：时间片轮转方式调度(*SCHED_RR*)。与 FIFO 相似，不同的是前者的每个线程都有一个执行时间配额，当采用 *SHCED_RR* 策略的线程的时间片用完，系统将重新分配时间片，并将该线程置于就绪队列尾，并且切换线程，放在队列尾保证了所有具有相同优先级的 RR 线程的调度公平。
+
+与调度相关的 API 接口如下：
+
+```c
+int pthread_attr_setinheritsched(pthread_attr_t *attr, int inheritsched);
+int pthread_attr_getinheritsched(const pthread_attr_t *attr, int *inheritsched);
+int pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy);
+int pthread_attr_getschedpolicy(const pthread_attr_t *attr, int *policy);
+```
+
+若函数调用成功返回 0，否则返回对应的错误代码。
+
+参数说明：
+
+- `attr`：指向一个线程属性的指针。
+- `inheritsched`：线程是否继承调度属性，可选值为
+    - *PTHREAD_INHERIT_SCHED*：调度属性将继承于创建的线程，`attr` 中设置的调度属性将被忽略。
+    - *PTHREAD_EXPLICIT_SCHED*：调度属性将被设置为 `attr` 中指定的属性值。
+- `policy`：可选值为线程的三种调度策略，*SCHED_OTHER*、*SCHED_FIFO*、*SCHED_RR*。
+
+##### 34.3.5 线程的优先级
+
+顾名思义，线程优先级就是这个线程得到运行的优先顺序，在 Linux 系统中，==优先级数值越小，线程优先级越高==。Linux 会根据线程的优先级对线程进行调度，遵循线程属性中指定的调度策略。
+
+获取、设置线程静态优先级（staticpriority）可以使用以下函数，注意，是静态优先级，当线程的调度策略为 *SCHED_OTHER* 时，其静态优先级必须设置为 0。该调度策略是 Linux 系统调度的默认策略，处于 0 优先级别的这些线程会按照动态优先级被调度，之所以被称为 “动态”，是因为它会随着线程的运行，根据线程的表现而发生改变，而动态优先级起始于线程的 `nice` 值，且每当一个线程已处于就绪态但被调度器调度无视时，其动态优先级会自动增加一个单位，这样能保证这些线程竞争 CPU 的公平性。
+
+线程的静态优先级之所以被称为 “静态”，是因为只要你不强行使用相关函数修改它，它是不会随着线程的执行而发生改变，静态优先级决定了实时线程的基本调度次序，它们是在实时调度策略中使用的。
+
+```c
+int pthread_attr_setschedparam(pthread_attr_t *attr, const struct sched_param *param);
+int pthread_attr_getschedparam(const pthread_attr_t *attr, struct sched_param *param);
+```
+
+参数说明：
+
+- `attr`：指向一个线程属性的指针。
+- `param`：静态优先级数值。
+
+线程优先级有以下特点：
+
+- 新线程的优先级为默认为 0。
+- 新线程不继承父线程调度优先级(*PTHREAD_EXPLICIT_SCHED*)
+- 当线程的调度策略为 *SCHED_OTHER* 时，不允许修改线程优先级，仅当调度策略为实时（即*SCHED_RR* 或*SCHED_FIFO*）时才有效，并可以在运行时通过 `pthread_setschedparam()` 函数来改变，默认为 0。
+
+##### 34.3.6 线程栈
+
+线程栈是非常重要的资源，它可以存放函数形参、局部变量、线程切换现场寄存器等数据，在前文我们也说过了，线程使用的是进程的内存空间，那么一个进程有 n 个线程，默认的线程栈大小是 1 M，那么就有可能导致进程的内存空间是不够的，因此在有多线程的情况下，我们可以适当减小某些线程栈的大小，防止进程的内存空间不足。而某些线程可能需要完成很大量的工作，或者线程调用的函数会分配很大的局部变量，亦或是函数调用层次很深时，需要的栈空间可能会很大，那么也可以增大线程栈的大小。
+
+设置、获取线程栈大小可以使用以下函数：
+
+```c
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize);
+int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize);
+```
+
+参数说明：
+
+- `attr`：指向一个线程属性的指针。
+- `stacksize`：线程栈的大小。
+
+#### 34.4 线程退出
+
+在线程创建后，系统就开始运行相关的线程函数，在该函数运行完之后，该线程也就退出了，这是线程的一种隐式退出的方法，这与进程的退出差不多，进程完成工作后就会退出。而另一种退出线程的方法是使用 `pthread_exit()` 函数，让线程显式退出，这是线程的主动行为。
+
+> [!caution]
+>
+> 在使用线程函数时，不能随意使用 `exit()` 退出函数来进行出错处理，这是因为`exit()` 函数的作用是使调用进程终止，而一个进程往往包含多个线程，因此，在使用 `exit()` 之后，该进程中的所有线程都会被退出，因此在线程中只能调用线程退出函数 `pthread_exit()` 而不是调用进程退出函数 `exit()`。
+
+函数原型：
+
+```c
+void pthread_exit(void *retval);
+```
+
+参数说明：
+
+- `retval`：如果 `retval` 不为空，则会将线程的退出值保存到 `retval` 中，如果不关心线程的退出值，形参为 NULL 即可。
+
+一般情况下，进程中各个线程的运行是相互独立的，线程的终止并不会相互通知，也不会影响其他的线程，<u>终止的线程所占用的资源不会随着线程的终止而归还系统，而是仍为线程所在的进程持有，这是因为一个进程中的多个线程是共享数据段的。</u>从前面的文章我们知道进程之间可以使用 `wait()` 系统调用来等待其他进程结束一样，线程也有类似的函数：
+
+```c
+int pthread_join(pthread_t tid, void **rval_ptr)；
+```
+
+如果某个线程想要等待另一个线程退出，并且获取它的退出值，那么就可以使用 `pthread_join()` 函数完成，以阻塞的方式等待 thread 指定的线程结束，当函数返回时，被等待线程的资源将被收回，如果进程已经结束，那么该函数会立即返回。并且 thread 指定的线程必须是可结合状态的，该函数执行成功返回 0，否则返回对应的错误代码。
+
+参数说明：
+
+- `thread`: 线程标识符，即线程 ID，标识唯一线程。
+- `retval`: 用户定义的指针，用来存储被等待线程的返回值。
+
+需要注意的是一个可结合状态的线程所占用的内存仅当有线程对其执行了 `pthread_join()` 后才会释放，因此<u>为了避免内存泄漏，所有线程的终止时，要么已被设为 *DETACHED*，要么使用 `pthread_join()` 来回收资源。</u>
+
+#### 34.5 线程实验
+
+我们在日常使用的情况下，若非特别需要，几乎不需要修改线程的属性的，我们在此处做一个线程的实验，实验中创建一个进程，线程的属性是默认属性，在线程执行完毕后就退出，代码如下：
+
+```c
+// path: base_linux/system_programing/thread/sources/thread.c
+#include <unistd.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+
+// 要执行的线程
+void *test_thread(void *arg)
+{
+    // sizeof(void *) == 8 and sizeof(int) == 4 (64 bits)
+    int num = (unsigned long long)arg;
+
+    printf("This is test thread, arg is %d\n", num);
+    sleep(5);
+
+    // 退出线程
+    pthread_exit(NULL);
+}
+
+int main(void)
+{
+    pthread_t thread;
+    void *thread_return;
+    int arg = 520;
+    int res;
+
+    printf("start create thread\n");
+
+    // 创建线程, 线程为 test_thread 函数
+    res = pthread_create(&thread, NULL, test_thread, (void *)(unsigned long long)(arg));
+
+    if (res != 0)
+    {
+        printf("create thread fail\n");
+        exit(res);
+    }
+
+    printf("create threads success\n");
+    printf("waiting for threads to finish...\n");
+
+    // 等待线程终止
+    res = pthread_join(thread, &thread_return);
+    if (res != 0)
+    {
+        printf("thread exit fail\n");
+        exit(res);
+    }
+
+    printf("thread exit ok\n");
+
+    return 0;
+}
+```
+
+代码的分析如下：
+
+- 第 9~19 行，定义 `test_thread` 函数作为线程要执行的函数，函数内部的操作是打印传入的 `arg` 参数，然后睡眠一定的时间，最后调用 `thread_exit` 退出线程。
+- 第 31 行，调用 `pthread_create` 函数创建线程，传入的线程函数指针为 `test_thread`，并且传入了一个函数参数 `arg（520）`，创建后线程将会开始执行 `test_thread` 的代码。
+- 第 43 行，创建线程后调用 `pthread_join` 等待线程退出。
+
+要注意的是，本示例中需要在 Makefile 中添加 `lpthread` 链接库的内容：
+Makefile 文件：
+
+```makefile
+# base_linux/system_programing/thread/Makefile
+TARGET = thread
+
+ARCH ?= arm
+
+BUILD_DIR = build_$(ARCH)
+
+SRC_DIR = sources
+
+INC_DIR = includes .
+
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+
+OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(notdir $(SRCS)))
+
+DEPS = $(wildcard $(INC_DIR)/*.h)
+
+CFLAGS = $(patsubst %, -I %, $(INC_DIR))
+
+LINK = -lpthread
+
+ifeq ($(ARCH), arm)
+CC = gcc
+else
+CC = aarch64-linux-gnu-gcc
+endif
+
+$(BUILD_DIR)/$(TARGET): $(OBJS)
+	$(CC) -o $@ $^ $(CFLAGS) $(LINK)
+	@cp $(BUILD_DIR)/$(TARGET) .
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c $(DEPS)
+	@mkdir -p $(BUILD_DIR) 
+	$(CC) -c -o $@ $< $(CFLAGS) $(LINK)
+
+.PHONY: clean cleanall
+
+clean:
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET)
+
+cleanall:
+	rm -rf build_*
+	rm -f $(TARGET)
 
 ```
 
+编译 & 运行：
 
+```bash
+make
+./thread
+```
 
+运行结果如下：
 
+![image-20241114214516666](.assets/image-20241114214516666.png)
 
+### 35. POSIX 信号量
 
+本章节将讲述另一种进程/线程间通信的机制——POSIX 信号量，为了明确与 systemV 信号量间的区别，若非特别说明，本章出现的信号量均为 POSIX 信号量。也要注意请不要把它与之前所说的信号混淆了，信号与信号量是不同的两种机制。
 
+#### 35.1 POSIX 信号量基本概念
 
+信号量（Semaphore）是一种实现进程/线程间通信的机制，可以实现进程/线程之间同步或临界资源的互斥访问，常用于协助一组相互竞争的进程/线程来访问临界资源。在多进程/线程系统中，各进程/线程之间需要同步或互斥实现临界资源的保护，信号量功能可以为用户提供这方面的支持。
 
+在 POSIX 标准中，信号量分两种，一种是无名信号量，一种是有名信号量。==无名信号量==一般用于==进程/线程==间同步或互斥，而==有名信号量==一般用于==进程==间同步或互斥。有名信号量和无名信号量的差异在于创建和销毁的形式上，但是其他工作一样，==无名==信号量则直接保存在==内存==中，而==有名信==号量则要求==创建一个文件==。
 
+正如其名，无名信号量没有名字，它只能存在于内存中，这就要求使用信号量的进程/线程必须能访问无名信号量所在的这一块内存，所以无名信号量只能应用在同一进程内的线程之间同步或者互斥。相反，有名信号量可以通过名字访问，因此可以被任何知道它们名字的进程或者进程/线程使用。单个进程中使用 POSIX 信号量时，无名信号量更简单，多个进程间使用 POSIX 信号量时，有名信号量更简单。
 
+在多进程/线程操作系统环境下，多个进程/线程会同时运行，并且一些进程/线程之间可能存在一定的关联。多个进程/线程可能为了完成同一个进程/线程会相互协作，这样形成进程/线程之间的同步关系，因此可以使用信号量进行同步。
 
+而且在不同进程/线程之间，为了争夺有限的系统资源（硬件或软件资源）会进入竞争状态，这就是进程/线程之间的互斥关系。为了防止出现因多个程序同时访问一个共享资源而引发的一系列问题，我们需要一种方法，它可以通过生成并使用令牌来授权，在任一时刻只能有一个执行进程/线程访问代码的临界区域。
+
+临界区域是指执行数据更新的代码需要独占式地执行。而信号量就可以提供这样的一种访问机制，让一个临界区同一时间只有一个进程/线程在访问它，因此信号量是可以用来调协进程/线程对共享资源的访问。进程/线程之间的互斥与同步关系存在的根源在于临界资源。临界资源是在同一个时刻只允许有限个（通常只有一个）进程/线程可以访问（读）或修改（写）的资源，通常包括硬件资源（处理器、内存、存储器以及其他外围设备等）和软件资源（共享代码段，共享结构和变量等）。
+
+抽象的来讲，信号量中存在一个非负整数，所有获取它的进程/线程都会将该整数减一（获取它当然是为了使用资源），当该整数值为零时，所有试图获取它的进程/线程都将处于阻塞状态。通常一个信号量的计数值用于对应有效的资源数，表示剩下的可被占用的互斥资源数。其值的含义分两种情况：
+
+- 0：表示没有可用的信号量，进程/线程进入睡眠状态，直至信号量值大于 0。
+- 正值：表示有一个或多个可用的信号量，进程/线程可以使用该资源。进程/线程将信号量值减 1，表示它使用了一个资源单位。
+
+对信号量的操作可以分为两个：
+
+- `P` 操作：如果有可用的资源（信号量值大于 0），则占用一个资源（给信号量值减去一，进入临界区代码）; 如果没有可用的资源（信号量值等于 0），则被阻塞到，直到系统将资源分配给该进程/线程（进入等待队列，一直等到资源轮到该进程/线程）。这就像你要把车开进停车场之前，先要向保安申请一张停车卡一样，P 操作就是申请资源，如果申请成功，资源数（空闲的停车位）将会减少一个，如果申请失败，要不在门口等，要不就走人。
+- `V` 操作：如果在该信号量的等待队列中有进程/线程在等待资源，则唤醒一个阻塞的进程/线程。如果没有进程/线程等待它，则释放一个资源（给信号量值加一），就跟你从停车场出去的时候一样，空闲的停车位就会增加一个。
+
+举个例子，就是两个进程/线程共享信号量 `sem`，`sem` 可用信号量的数值为 1，一旦其中一个进程/线程执行了 P（sem）操作，它将得到信号量，并可以进入临界区，使 `sem` 减 1。而第二个进程/线程将被阻止进入临界区，因为当它试图执行 P（sem）操作时，`sem` 为 0，它会被挂起以等待第一个进程/线程离开临界区域并执行 V（sem）操作释放了信号量，这时第二个进程/线程就可以恢复执行。 
+
+#### 35.2 POSIX 有名信号量
+
+如果要在 Linux 中使用信号量同步，需要包含头文件 `semaphore.h` 。
+
+有名信号量其实是一个文件，它的名字由类似 `sem.[信号量名字]` 这样的字符串组成，注意看文件名前面有 `sem.`，它是一个特殊的信号量文件，在创建成功之后，系统会将其放置在 `/dev/shm` 路径下，不同的进程间只要约定好一个相同的信号量文件名字，就可以访问到对应的有名信号量，并且借助信号量来进行同步或者互斥操作，需要注意的是，有名信号量是一个文件，在进程退出之后它们并不会自动消失，而需要手工删除并释放资源。
+
+主要用到的函数：
+
+```c
+sem_t *sem_open(const char *name, int oflag, mode_t mode, unsigned int value);
+int sem_wait(sem_t *sem);
+int sem_trywait(sem_t *sem);
+int sem_post(sem_t *sem);
+int sem_close(sem_t *sem);
+int sem_unlink(const char *name);
+```
+
+- `sem_open()` 函数用于打开/创建一个有名信号量，它的参数说明如下：
+    - `name`：打开或者创建信号量的名字。
+    - `oflag`：当指定的文件不存在时，可以指定 *O_CREATE* 或者 *O_EXEL* 进行创建操作，如果指定为 0，后两个参数可省略，否则后面两个参数需要带上。
+    - `mode`：数字表示的文件读写权限，如果信号量已经存在，本参数会被忽略。
+    - `value`：信号量初始的值，这个参数只有在新创建的时候才需要设置，如果信号量已经存在，本参数会被忽略。
+    - 返回值：返回值是一个 `sem_t` 类型的指针，它指向已经创建/打开的信号量，后续的函数都通过改信号量指针去访问对应的信号量。
+- `sem_wait()` 函数是等待（获取）信号量，如果信号量的值大于 0，将信号量的值减 1，立即返回。如果信号量的值为 0，则进程/线程阻塞。相当于 P 操作。成功返回 0，失败返回 -1。
+- `sem_trywait()` 函数也是等待信号量，如果指定信号量的计数器为0，那么直接返回 *EAGAIN* 错误，而不是阻塞等待。
+- `sem_post()` 函数是释放信号量，让信号量的值加 1，相当于 V 操作。成功返回 0，失败返回 -1。
+- `sem_close()` 函数用于关闭一个信号量，这表示当前进程/线程取消对信号量的使用，<u>它的作用仅在当前进程/线程，其他进程/线程依然可以使用该信号量</u>，同时当进程结束的时候，无论是正常退出还是信号中断退出的进程，内核都会主动调用该函数去关闭进程使用的信号量，即使从此以后都没有其他进程/线程再使用这个信号量了，内核也会维持这个信号量。
+- `sem_unlink()` 函数就是主动删除一个信号量，直接删除指定名字的信号量文件。
+
+#### 35.3 POSIX 无名信号量
+
+无名信号量的操作与有名信号量差不多，但它不使用文件系统标识，直接存在程序运行的内存中，不同进程之间不能访问，不能用于不同进程之间相互访问。同样的一个父进程初始化一个信号量，然后 `fork` 其副本得到的是该信号量的副本，这两个信号量之间并不存在关系。
+
+主要用到的函数：
+
+```c
+int sem_init(sem_t *sem， int pshared， unsigned int value);
+int sem_destroy(sem_t *sem);
+int sem_wait(sem_t *sem);
+int sem_trywait(sem_t *sem);
+int sem_post(sem_t *sem);
+```
+
+- `sem_init()`：初始化信号量。
+    - 其中 `sem` 是要初始化的信号量，<u>不要对已初始化的信号量再做 `sem_init` 操作，会发生不可预知的问题</u>。
+    - `pshared` 表示此信号量是在进程间共享还是线程间共享，由于目前 Linux 还没有实现进程间共享无名信号量，所以这个值只能够取 0，表示这个信号量是当前进程的局部信号量。
+    - `value` 是信号量的初始值。
+    - 返回值：成功返回 0，失败返回 -1。
+- `sem_destroy()`：销毁信号量，其中 `sem` 是要销毁的信号量。<u>只有用 `sem_init` 初始化的信号量才能用 `sem_destroy()` 函数销毁</u>。成功返回 0，失败返回 -1。
+- `sem_wait()`、`sem_trywait()`、`sem_post()` 等函数与有名信号量的使用是一样的。
+
+#### 35.4 POSIX 信号量使用示例
+
+##### 35.4.1 有名信号量
 
 
 
