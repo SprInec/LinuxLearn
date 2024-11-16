@@ -1,6 +1,7 @@
-<p align="center">
+<div align="center">
 	<h1>Linux Leaning Notes</h1>
-</p>
+</div>
+
 
 这是一个记录本人学习 Linux 期间所有笔记及代码的工程，笔记文件名为 [LLN.md](LLN.md)，其内容大纲如下：
 
